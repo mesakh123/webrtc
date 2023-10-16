@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "378851307980",
+    "firebase_url": "https://streamproject-d6632-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "streamproject-d6632",
+    "storage_bucket": "streamproject-d6632.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:378851307980:android:e6873121b7aec01278ad69",
+        "android_client_info": {
+          "package_name": "com.example.webrtc"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1Q54oVGUGJyY0G28NyIZDCs6ltBgufNI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
