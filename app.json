@@ -12,7 +12,21 @@
       "backgroundColor": "#ffffff"
     },
     "plugins": [
-      "@config-plugins/react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 33,
+            "targetSdkVersion": 33,
+            "buildToolsVersion": "33.0.0",
+            "minSdkVersion":24
+          },
+          "ios": {
+            "deploymentTarget": "13.0"
+          }
+        }
+      ]
     ],
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -33,9 +47,9 @@
       "package": "com.example.webrtc",
       "permissions": [
         "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.INTERNET",
         "android.permission.BLUETOOTH",
         "android.permission.CAMERA",
-        "android.permission.INTERNET",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
@@ -45,6 +59,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fb139420-a265-405e-ae4b-af453da4cd69"
+      }
     }
   }
 }

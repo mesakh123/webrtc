@@ -15,6 +15,7 @@ import {
   RTCView,
   RTCPeerConnection,
   RTCSessionDescription,
+  MediaStream,
   mediaDevices,
 } from 'react-native-webrtc';
 import styles from './AppStyles';
@@ -30,7 +31,7 @@ class Demo extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      roomInput: '1234',
+      roomInput: '1',
       joinedRoom: null,
       alertText: null,
       videoDevices: [],
@@ -49,13 +50,19 @@ class Demo extends React.Component {
 
       selfViewSrc: null,
       selfViewSrcKey: null,
+      localStream: new MediaStream(),
+      localDisplayStream: new MediaStream(),
+
+      audioTracks: null,
+      videoTracks: null,
+      screenShared:false,
 
     };
     window.component = this;
   }
 
   componentDidMount() {
-    this.connectWs();
+    // this.connectWs();
   }
 
   connectWs = () => {
@@ -65,13 +72,21 @@ class Demo extends React.Component {
       this.setState({ alertText: null });
     }
     // const wsEndpoint = 'ws://localhost:8088';
-    const wsEndpoint = 'wss://nodejs-webrtc-signaling-server.herokuapp.com/';
+    const wsEndpoint = 'wss://mango-live.website/ws/live-room/';
     // eslint-disable-next-line no-undef
     this.ws = new WebSocket(wsEndpoint);
 
     this.ws.onopen = () => {
       console.log('WebSocket Client Connected');
       this.setState({ alertText: null });
+
+      // notify other peers
+      this.sendSignal(type, {
+        'local_screen_sharing': false,
+        "room_id": this.state.roomId, //TODO: fixme
+        "dest_user_id": null, //TODO: fixme
+        "src_user_id": this.state.userId //TODO: fixme
+      });
     };
     this.ws.onmessage = (e) => {
       this.handleMessage(JSON.parse(e.data));
@@ -81,7 +96,7 @@ class Demo extends React.Component {
       // show an error message
       this.setState({
         alertText:
-          'Websocket is closed, is the backend started? Tap here to try reconnecting.',
+          'Websocket is closed ' + wsEndpoint + ', is the backend started? Tap here to try reconnecting.',
       });
     };
   };
@@ -91,11 +106,11 @@ class Demo extends React.Component {
     this.ws.send(JSON.stringify(message));
   };
 
-  sendSignal = (action,data) => {
+  sendSignal = (action, data) => {
     this.ws.send(JSON.stringify(
       {
-          'action': action,
-          'data': data,
+        'action': action,
+        'data': data,
       }
     ));
   };
@@ -103,7 +118,8 @@ class Demo extends React.Component {
   joinOrLeaveRoom = () => {
     // leave the room if already in one
     if (this.state.joinedRoom) {
-      this.sendMessage({ action: 'leave', room: this.state.joinedRoom });
+      // this.sendMessage({ action: 'leave', room: this.state.joinedRoom });
+
       [...this.state.peers.keys()].forEach(async (key) => {
         try {
           await this.closePeer(key);
@@ -111,8 +127,14 @@ class Demo extends React.Component {
           console.warn(`Error closing peer ${key}`);
         }
       });
-      this.setState({ joinedRoom: null, room: '1234' });
+      this.setState({ joinedRoom: null, room: '' });
       return;
+    }
+
+
+    var current_action = "streamer_join_room";
+    if (this.state.userType == "viewer") {
+      current_action = "viewer_join_room";
     }
     const roomInputValue = this.state.roomInput;
     // alert that the room name is required
@@ -120,46 +142,113 @@ class Demo extends React.Component {
       Alert.alert('Room Name is required.');
       return;
     }
+
     // actually join the room if the above checks pass
     this.setState({ joinedRoom: roomInputValue }, () => {
-      this.sendMessage({ action: 'join', room: this.state.joinedRoom });
+
+      this.sendSignal(current_action, {
+        'local_screen_sharing': false,
+        "room_id": this.state.joinedRoom, //TODO: fixme
+        "src_user_id": this.state.userId //TODO: fixme
+      })
+
     });
+
+    this.connectWs();
   };
-  handleMessage = async (message) => {
+  handleMessage = async (event) => {
     try {
-      const sessionId = message.sessionId;
+      var parsedData = JSON.parse(event.data)["data"]
+      var localScreenSharing = parsedData.remote_screen_sharing;
+      var src_user_id = parsedData.src_user_id;
+      var dest_user_id = parsedData.dest_user_id;
+      var parsed_room_id = parsedData.room_id;
+
+      if (parsed_room_id != roomId) {
+
+        return;
+      }
+
+      try {
+        if (parsedData.success == false && this.state.userId == dest_user_id) {
+          throw new Error(parsedData.message);
+        }
+      }
+      catch (e) {
+        Alert.alert("Websocket error : " + e);
+        if (action == "viewer_join_room") {
+          this.ws.dispatchEvent(new Event("error", { error: e }));
+          return
+        }
+      }
+
+      if (dest_user_id && dest_user_id != this.state.userId) {
+        console.log("current user id :", this.state.userId);
+        console.log("dest user id :", dest_user_id);
+        // ignore all messages from oneself
+        return;
+      }
+
       switch (message.action) {
-        case 'created':
-          console.log(`Created session with id: ${sessionId}`);
-          this.setState({ wsSessionId: sessionId });
-          break;
-        case 'join':
+        case 'viewer_join_room':
           console.log(`User ${sessionId} joined room`);
           // when another user joins, create an RTCPeerConnection and send them an SDP offer
-          await this.createPeer(sessionId, null);
+          await this.createOfferer(src_user_id, dest_user_id, false, remoteScreenSharing, receiver_channel_name);
+          if (this.state.screenShared && !remoteScreenSharing) {
+            // if local screen is being shared
+            // and remote peer is not sharing screen
+            // send offer from screen sharing peer
+            console.log('Creating screen sharing offer.');
+            await this.createOfferer(src_user_id, dest_user_id, false, remoteScreenSharing, receiver_channel_name);
+          }
           break;
-        case 'sdpOffer':
+        case 'new-offer':
           console.log(`SDP Offer received from ${sessionId}`);
           // when another user sends an SDP offer, replay with an SDP Answer
-          await this.createPeer(sessionId, message.jsep);
+
+          // create new RTCPeerConnection
+          // set offer as remote description
+          var offer = parsedData.sdp;
+          await this.createAnswerer(offer, src_user_id, dest_user_id, localScreenSharing, remoteScreenSharing, receiver_channel_name);
+
           break;
-        case 'sdpAnswer':
-          console.log(`SDP Answer received from ${sessionId}`);
-          // when another user sends an SDP Answer, process it
-          await this.state.peers
-            .get(sessionId)
-            .setRemoteDescription(message.jsep);
+        case 'new-answer':
+          // in case of answer to previous offer
+          // get the corresponding RTCPeerConnection
+          var peer = null;
+
+          if (remoteScreenSharing) {
+            // if answerer is screen sharer
+            peer = mapPeers[src_user_id + ' Screen'][0];
+          } else if (localScreenSharing) {
+            // if offerer was screen sharer
+            peer = mapScreenPeers[src_user_id][0];
+          } else {
+            // if both are non-screen sharers
+            peer = mapPeers[src_user_id][0];
+          }
+
+          // get the answer
+          var answer = parsedData['sdp'];
+
+          console.log('mapPeers:');
+          for (key in mapPeers) {
+            console.log(key, ': ', mapPeers[key]);
+          }
+
+          console.log('peer: ', peer);
+          console.log('answer: ', answer);
+
+          // set remote description of the RTCPeerConnection
+          peer.setRemoteDescription(answer);
+
           break;
-        case 'trickle':
-          console.log(`ICE Candidate received from ${sessionId}`);
-          // when another user sends an ICE Candidate, add it immediately or wiat for SDP process to complete
-          await this.addRemoteIceCandidate(sessionId, message.candidate);
-          break;
-        case 'leave':
-          console.log(`User ${sessionId} left room`);
-          // when another user leaves, dispose their peer connection and video tag
-          await this.closePeer(sessionId);
-          break;
+        case "chat":
+          if (this.state.userId == src_user_id) {
+            return;
+          }
+          var nodeText = parsedData.username + ": " + parsedData.message
+
         default:
           console.warn(`Unrecognized method: ${message.action}`);
       }
@@ -169,127 +258,8 @@ class Demo extends React.Component {
     }
   };
 
-  // the sessionId is of the remote peer, and if the remoteSdpOffer is present, an SDP Answer is returned instead of an SDP Offer
-  createPeer = async (sessionId, remoteSdpOffer) => {
-    try {
-      // instantiate the peer connection, making sure to configure STUN servers
-      const webRtcPeer = new RTCPeerConnection({
-        iceServers: [
-          {
-            url: 'stun:global.stun.twilio.com:3478?transport=udp',
-            urls: 'stun:global.stun.twilio.com:3478?transport=udp',
-          },
-        ],
-      });
 
-      // send any gathered ICE Candidates to the other peer
-      webRtcPeer.onicecandidate = (ev) => {
-        this.sendMessage({
-          action: 'trickle',
-          room: this.state.joinedRoom,
-          targetSessionId: sessionId,
-          candidate: ev.candidate?.toJSON(),
-        });
-      };
 
-      // listen for signaling state changes
-      webRtcPeer.onsignalingstatechange = (ev) => {
-        const connection = ev.target;
-        console.log(`SignalingStateChange: ${connection.signalingState}`);
-        // once the signaling state is stable, process any early ICE Candidates
-        if (connection.signalingState === 'stable') {
-          this.handleEarlyRemoteCandidates(webRtcPeer, sessionId);
-        }
-      };
-
-      webRtcPeer.onaddstream = async ({ stream }) =>
-        await this.addVideo(sessionId, stream);
-      webRtcPeer.ontrack = async (ev) => {
-        if (ev.track.kind === 'video') {
-          await this.addVideo(sessionId, ev.streams[0]);
-        }
-      };
-
-      // add the local stream (if available) so the remote peer can view it
-      const localStream = this.state.streams.get(this.state.wsSessionId);
-      if (localStream) {
-        webRtcPeer.addStream(localStream);
-      }
-
-      let action;
-      let jsep;
-      if (remoteSdpOffer) {
-        // if an SDP Offer was passed in, create an SDP Answer
-        await webRtcPeer.setRemoteDescription(
-          new RTCSessionDescription({ type: 'offer', sdp: remoteSdpOffer.sdp }),
-        );
-        jsep = await webRtcPeer.createAnswer();
-        console.log(jsep);
-        await webRtcPeer.setLocalDescription(jsep);
-        action = 'sdpAnswer';
-      } else {
-        // otherwise create an SDP Offer
-        jsep = await webRtcPeer.createOffer({
-          offerToReceiveAudio: 1,
-          offerToReceiveVideo: 1,
-        });
-        console.log(jsep);
-        await webRtcPeer.setLocalDescription(jsep);
-        action = 'sdpOffer';
-      }
-      // send either the SDP Offer or SDP Answer to the other peer
-      this.sendMessage({
-        room: this.state.joinedRoom,
-        action,
-        jsep,
-        targetSessionId: sessionId,
-      });
-      // save the peer for access later (during the trickle process or for SDP Answer)
-      const peers = this.state.peers.set(sessionId, webRtcPeer);
-      await this.setState({
-        peers: peers,
-      });
-    } catch (err) {
-      console.log('Error sending SDP offer');
-      console.error(err);
-    }
-  };
-
-  addRemoteIceCandidate = async (sessionId, candidate) => {
-    console.log('addRemoteIceCandidate');
-    const remotePeer = this.state.peers.get(sessionId);
-    if (remotePeer && candidate && remotePeer.signalingState === 'stable') {
-      await remotePeer.addIceCandidate(candidate);
-    } else {
-      const earlyCandidates = this.state.earlyCandidates.has(sessionId)
-        ? this.state.earlyCandidates.get(sessionId)
-        : [];
-      earlyCandidates.push(candidate);
-      await this.setState({
-        earlyCandidates: new Map(
-          this.state.earlyCandidates.set(sessionId, earlyCandidates),
-        ),
-      });
-    }
-  };
-
-  handleEarlyRemoteCandidates = async (webRtcPeer, sessionId) => {
-    console.log('handleEarlyRemoteCandidates');
-    const earlyCandidates = this.state.earlyCandidates.has(sessionId)
-      ? this.state.earlyCandidates.get(sessionId)
-      : [];
-    for (const candidate of earlyCandidates) {
-      if (candidate && webRtcPeer.connectionState !== 'closed') {
-        await webRtcPeer.addIceCandidate(candidate);
-      }
-    }
-    // stop storing the early ICE Candiates for that session
-    const earlyCandidatesMap = this.state.earlyCandidates;
-    earlyCandidatesMap.delete(sessionId);
-    await this.setState({
-      earlyCandidates: new Map(earlyCandidatesMap),
-    });
-  };
   closePeer = async (sessionId) => {
     console.log('closePeer');
     const peer = this.state.peers.get(sessionId);
@@ -325,7 +295,23 @@ class Demo extends React.Component {
           // facingMode: this.state.isFront ? 'user' : 'environment',
           deviceId,
         },
-      });
+      }).then(
+        stream=>{
+          this.setState({localStream:stream});
+          var audioTracks = stream.getAudioTracks();
+          var videoTracks = stream.getVideoTracks();
+          this.setState({
+            audioTracks:audioTracks,
+            videoTracks:videoTracks
+          })
+          console.log("audiotracks : ",this.audioTracks);
+          console.log("videoTracks : ",this.videoTracks);
+          // unmute audio and video by default
+          audioTracks[0].enabled = true;
+          videoTracks[0].enabled = true;
+
+        }
+      );
       this.setState({ deviceId });
       await this.setupVideoDeviceList();
       await this.addVideo(this.state.wsSessionId, stream);
@@ -360,6 +346,337 @@ class Demo extends React.Component {
   roomInputChange = (roomInput) => this.setState({ roomInput });
   userIdInputChange = (userId) => this.setState({ userId })
   chatInputChange = (message) => this.setState({ message });
+
+  addLocalTracks = (peer, localScreenSharing) => {
+    if (!localScreenSharing) {
+      // if it is not a screen sharing peer
+      // add user media tracks
+      this.state.localStream.getTracks().forEach(track => {
+        console.log('Adding localStream tracks.');
+        peer.addTrack(track, this.state.localStream);
+      });
+
+      return;
+    }
+
+    // if it is a screen sharing peer
+    // add display media tracks
+    this.state.localDisplayStream.getTracks().forEach(track => {
+      console.log('Adding localDisplayStream tracks.');
+      peer.addTrack(track, this.state.localDisplayStream);
+    });
+  }
+
+
+  // create RTCPeerConnection as offerer
+  // and store it and its datachannel
+  // send sdp to remote peer after gathering is complete
+  createOfferer = async (srcPeerUserId, destPeerUserId, localScreenSharing, remoteScreenSharing, receiver_channel_name) => {
+    var peer = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: 'stun:stun.l.google.com:19302',
+        },
+        {
+          urls: 'stun:stun1.l.google.com:19302',
+        },
+        {
+          urls: 'stun:stun2.l.google.com:19302',
+        },
+      ]
+    });
+
+    // add local user media stream tracks
+    this.addLocalTracks(peer, localScreenSharing);
+
+    // create and manage an RTCDataChannel
+    var dc = peer.createDataChannel("channel");
+    dc.onopen = () => {
+      console.log("Connection opened.");
+    };
+    if (!localScreenSharing && !remoteScreenSharing) {
+      // none of the peers are sharing screen (normal operation)
+
+      dc.onmessage = this.dcOnMessage;
+
+
+      // store the RTCPeerConnection
+      // and the corresponding RTCDataChannel
+      mapPeers[srcPeerUserId] = [peer, dc];
+
+      peer.oniceconnectionstatechange = () => {
+        var iceConnectionState = peer.iceConnectionState;
+        if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
+          console.log('Deleting peer');
+          delete mapPeers[srcPeerUserId];
+          if (iceConnectionState != 'closed') {
+            peer.close();
+          }
+          // removeVideo(remoteVideo);
+        }
+      };
+    } else if (!localScreenSharing && remoteScreenSharing) {
+      // answerer is screen sharing
+
+      dc.onmessage = (e) => {
+        console.log('New message from %s\'s screen: ', srcPeerUserId, e.data);
+      };
+
+      // remoteVideo = createVideo(srcPeerUserId + '-screen');
+      // setOnTrack(peer, remoteVideo);
+      // console.log('Remote video source: ', remoteVideo.srcObject);
+
+      // if offer is not for screen sharing peer
+      mapPeers[srcPeerUserId + ' Screen'] = [peer, dc];
+
+      peer.oniceconnectionstatechange = () => {
+        var iceConnectionState = peer.iceConnectionState;
+        if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
+          delete mapPeers[peerUserId + ' Screen'];
+          if (iceConnectionState != 'closed') {
+            peer.close();
+          }
+          // removeVideo(remoteVideo);
+        }
+      };
+    } else {
+      // offerer itself is sharing screen
+
+      dc.onmessage = (e) => {
+        console.log('New message from %s: ', srcPeerUserId, e.data);
+      };
+
+      mapScreenPeers[srcPeerUserId] = [peer, dc];
+
+      peer.oniceconnectionstatechange = () => {
+        var iceConnectionState = peer.iceConnectionState;
+        if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
+          delete mapScreenPeers[srcPeerUserId];
+          if (iceConnectionState != 'closed') {
+            peer.close();
+          }
+        }
+      };
+    }
+
+    peer.onicecandidate = (event) => {
+      if (event.candidate) {
+        return;
+      }
+
+      // event.candidate == null indicates that gathering is complete
+
+      console.log('Gathering finished! Sending offer SDP to ', srcPeerUserId, '.');
+      console.log('receiverChannelName: ', receiver_channel_name);
+
+      // send offer to new peer
+      // after ice candidate gathering is complete
+      this.sendSignal('new-offer', {
+        'sdp': peer.localDescription,
+        'receiver_channel_name': receiver_channel_name,
+        'local_screen_sharing': localScreenSharing,
+        'remote_screen_sharing': remoteScreenSharing,
+        "room_id": roomId,
+        "src_user_id": destPeerUserId,
+        "dest_user_id": srcPeerUserId
+      });
+    }
+
+    peer.createOffer()
+      .then(o => peer.setLocalDescription(o))
+      .then(function (event) {
+        console.log("Local Description Set successfully.");
+      });
+
+    console.log('mapPeers[', srcPeerUserId, ']: ', mapPeers[srcPeerUserId]);
+
+    return peer;
+  }
+
+  dcOnMessage = (event) => {
+    var message = event.data;
+
+
+  }
+  // create RTCPeerConnection as answerer
+  // and store it and its datachannel
+  // send sdp to remote peer after gathering is complete
+  createAnswerer = async (offer, srcPeerUserId, destPeerUserId, localScreenSharing, remoteScreenSharing, receiver_channel_name) => {
+    var peer = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: 'stun:stun.l.google.com:19302',
+        },
+        {
+          urls: 'stun:stun1.l.google.com:19302',
+        },
+        {
+          urls: 'stun:stun2.l.google.com:19302',
+        },
+      ]
+    });
+
+
+    this.addLocalTracks(peer, localScreenSharing);
+    console.log("localScreenSharing", localScreenSharing)
+    console.log("remoteScreenSharing", remoteScreenSharing)
+    if (!localScreenSharing && !remoteScreenSharing) {
+      // if none are sharing screens (normal operation)
+
+      // set remote video
+      var remoteVideo = this.createVideo(srcPeerUserId);
+
+      // and add tracks to remote video
+      setOnTrack(peer, remoteVideo);
+
+      // it will have an RTCDataChannel
+      peer.ondatachannel = e => {
+        console.log('e.channel.label: ', e.channel.label);
+        peer.dc = e.channel;
+        peer.dc.onmessage = this.dcOnMessage;
+        peer.dc.onopen = () => {
+          console.log("Connection opened.");
+        }
+
+        // store the RTCPeerConnection
+        // and the corresponding RTCDataChannel
+        // after the RTCDataChannel is ready
+        // otherwise, peer.dc may be undefined
+        // as peer.ondatachannel would not be called yet
+        mapPeers[srcPeerUserId] = [peer, peer.dc];
+      }
+
+      peer.oniceconnectionstatechange = () => {
+        var iceConnectionState = peer.iceConnectionState;
+        if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
+          delete mapPeers[srcPeerUserId];
+          if (iceConnectionState != 'closed') {
+            peer.close();
+          }
+          //removeVideo(remoteVideo);
+        }
+      };
+    } else if (localScreenSharing && !remoteScreenSharing) {
+      // answerer itself is sharing screen
+
+      // it will have an RTCDataChannel
+      peer.ondatachannel = e => {
+        peer.dc = e.channel;
+        peer.dc.onmessage = (evt) => {
+          console.log('New message from %s: ', srcPeerUserId, evt.data);
+        }
+        peer.dc.onopen = () => {
+          console.log("Connection opened.");
+        }
+
+        // this peer is a screen sharer
+        // so its connections will be stored in mapScreenPeers
+        // store the RTCPeerConnection
+        // and the corresponding RTCDataChannel
+        // after the RTCDataChannel is ready
+        // otherwise, peer.dc may be undefined
+        // as peer.ondatachannel would not be called yet
+        mapScreenPeers[srcPeerUserId] = [peer, peer.dc];
+
+        peer.oniceconnectionstatechange = () => {
+          var iceConnectionState = peer.iceConnectionState;
+          if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
+            delete mapScreenPeers[srcPeerUserId];
+            if (iceConnectionState != 'closed') {
+              peer.close();
+            }
+          }
+        };
+      }
+    } else {
+      // offerer is sharing screen
+
+      // set remote video
+      var remoteVideo = createVideo(srcPeerUserId + '-screen');
+      // and add tracks to remote video
+      setOnTrack(peer, remoteVideo);
+
+      // it will have an RTCDataChannel
+      peer.ondatachannel = e => {
+        peer.dc = e.channel;
+        peer.dc.onmessage = evt => {
+          console.log('New message from %s\'s screen: ', srcPeerUserId, evt.data);
+        }
+        peer.dc.onopen = () => {
+          console.log("Connection opened.");
+        }
+
+        // store the RTCPeerConnection
+        // and the corresponding RTCDataChannel
+        // after the RTCDataChannel is ready
+        // otherwise, peer.dc may be undefined
+        // as peer.ondatachannel would not be called yet
+        mapPeers[srcPeerUserId + ' Screen'] = [peer, peer.dc];
+
+      }
+      peer.oniceconnectionstatechange = () => {
+        var iceConnectionState = peer.iceConnectionState;
+        if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
+          delete mapPeers[srcPeerUserId + ' Screen'];
+          if (iceConnectionState != 'closed') {
+            peer.close();
+          }
+          //removeVideo(remoteVideo);
+        }
+      };
+    }
+
+    peer.onicecandidate = (event) => {
+      if (event.candidate) {
+        return;
+      }
+
+      // event.candidate == null indicates that gathering is complete
+
+      console.log('Gathering finished! Sending answer SDP to ', srcPeerUserId, '.');
+      console.log('receiverChannelName: ', receiver_channel_name);
+
+      // send answer to offering peer
+      // after ice candidate gathering is complete
+      // answer needs to send two types of screen sharing data
+      // local and remote so that offerer can understand
+      // to which RTCPeerConnection this answer belongs
+      this.sendSignal('new-answer', {
+        'sdp': peer.localDescription,
+        'receiver_channel_name': receiver_channel_name,
+        'local_screen_sharing': localScreenSharing,
+        'remote_screen_sharing': remoteScreenSharing,
+        "room_id": roomId,
+        "src_user_id": destPeerUserId,
+        "dest_user_id": srcPeerUserId
+      });
+    }
+
+    peer.setRemoteDescription(offer)
+      .then(() => {
+        console.log('Set offer from %s.', srcPeerUserId);
+        return peer.createAnswer();
+      })
+      .then(a => {
+        console.log('Setting local answer for %s.', srcPeerUserId);
+        return peer.setLocalDescription(a);
+      })
+      .then(() => {
+        console.log('Answer created for %s.', srcPeerUserId);
+        console.log('localDescription: ', peer.localDescription);
+        console.log('remoteDescription: ', peer.remoteDescription);
+      })
+      .catch(error => {
+        console.log('Error creating answer for %s.', srcPeerUserId);
+        console.log(error);
+      });
+
+    return peer
+  }
+
+
+
+
 
   render() {
     const isActiveStreamer = this.state.streams.has(this.state.wsSessionId);
@@ -416,7 +733,7 @@ class Demo extends React.Component {
                     "src_user_id": this.state.userId,
                     "message": currentMessage,
                   });
-                  this.setState({message:null});
+                  this.setState({ message: null });
 
                 }}
                 title='Send'

@@ -15,3 +15,18 @@
 - [Expo Config Plugin: WebRTC](https://github.com/expo/config-plugins/tree/master/packages/react-native-webrtc)
 - [Expo Development Client docs](https://docs.expo.dev/clients/introduction/)
 - [Building with EAS](https://docs.expo.dev/eas/)
+
+
+
+## build error
+
+npx expo prebuild --clean
+npx expo run:android
+
+## build apk
+
+mkdir android/app/src/main/assets/ && react-native bundle --platform android --dev true --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+
+cd android
+
+gradlew assembleDebug
