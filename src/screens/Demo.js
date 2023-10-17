@@ -62,7 +62,7 @@ class Demo extends React.Component {
   }
 
   componentDidMount() {
-    // this.connectWs();
+    this.connectWs();
   }
 
   connectWs = () => {
@@ -81,7 +81,9 @@ class Demo extends React.Component {
       this.setState({ alertText: null });
 
       // notify other peers
-      this.sendSignal(type, {
+
+      var action = this.userType=="streamer" ? "streamer_join_room"  :"viewer_join_room";
+      this.sendSignal(action, {
         'local_screen_sharing': false,
         "room_id": this.state.roomId, //TODO: fixme
         "dest_user_id": null, //TODO: fixme
@@ -120,6 +122,7 @@ class Demo extends React.Component {
     if (this.state.joinedRoom) {
       // this.sendMessage({ action: 'leave', room: this.state.joinedRoom });
 
+
       [...this.state.peers.keys()].forEach(async (key) => {
         try {
           await this.closePeer(key);
@@ -154,108 +157,109 @@ class Demo extends React.Component {
 
     });
 
-    this.connectWs();
   };
   handleMessage = async (event) => {
-    try {
-      var parsedData = JSON.parse(event.data)["data"]
-      var localScreenSharing = parsedData.remote_screen_sharing;
-      var src_user_id = parsedData.src_user_id;
-      var dest_user_id = parsedData.dest_user_id;
-      var parsed_room_id = parsedData.room_id;
 
-      if (parsed_room_id != roomId) {
+    console.log("event",event)
 
-        return;
-      }
+    var parsedData = JSON.parse(event)
+    console.log("parsedData",parsedData)
+    var localScreenSharing = parsedData.remote_screen_sharing;
+    var src_user_id = parsedData.src_user_id;
+    var dest_user_id = parsedData.dest_user_id;
+    var parsed_room_id = parsedData.room_id;
 
-      try {
-        if (parsedData.success == false && this.state.userId == dest_user_id) {
-          throw new Error(parsedData.message);
-        }
-      }
-      catch (e) {
-        Alert.alert("Websocket error : " + e);
-        if (action == "viewer_join_room") {
-          this.ws.dispatchEvent(new Event("error", { error: e }));
-          return
-        }
-      }
+    if (parsed_room_id != roomId) {
 
-      if (dest_user_id && dest_user_id != this.state.userId) {
-        console.log("current user id :", this.state.userId);
-        console.log("dest user id :", dest_user_id);
-        // ignore all messages from oneself
-        return;
-      }
-
-      switch (message.action) {
-        case 'viewer_join_room':
-          console.log(`User ${sessionId} joined room`);
-          // when another user joins, create an RTCPeerConnection and send them an SDP offer
-          await this.createOfferer(src_user_id, dest_user_id, false, remoteScreenSharing, receiver_channel_name);
-          if (this.state.screenShared && !remoteScreenSharing) {
-            // if local screen is being shared
-            // and remote peer is not sharing screen
-            // send offer from screen sharing peer
-            console.log('Creating screen sharing offer.');
-            await this.createOfferer(src_user_id, dest_user_id, false, remoteScreenSharing, receiver_channel_name);
-          }
-          break;
-        case 'new-offer':
-          console.log(`SDP Offer received from ${sessionId}`);
-          // when another user sends an SDP offer, replay with an SDP Answer
-
-          // create new RTCPeerConnection
-          // set offer as remote description
-          var offer = parsedData.sdp;
-          await this.createAnswerer(offer, src_user_id, dest_user_id, localScreenSharing, remoteScreenSharing, receiver_channel_name);
-
-          break;
-        case 'new-answer':
-          // in case of answer to previous offer
-          // get the corresponding RTCPeerConnection
-          var peer = null;
-
-          if (remoteScreenSharing) {
-            // if answerer is screen sharer
-            peer = mapPeers[src_user_id + ' Screen'][0];
-          } else if (localScreenSharing) {
-            // if offerer was screen sharer
-            peer = mapScreenPeers[src_user_id][0];
-          } else {
-            // if both are non-screen sharers
-            peer = mapPeers[src_user_id][0];
-          }
-
-          // get the answer
-          var answer = parsedData['sdp'];
-
-          console.log('mapPeers:');
-          for (key in mapPeers) {
-            console.log(key, ': ', mapPeers[key]);
-          }
-
-          console.log('peer: ', peer);
-          console.log('answer: ', answer);
-
-          // set remote description of the RTCPeerConnection
-          peer.setRemoteDescription(answer);
-
-          break;
-        case "chat":
-          if (this.state.userId == src_user_id) {
-            return;
-          }
-          var nodeText = parsedData.username + ": " + parsedData.message
-
-        default:
-          console.warn(`Unrecognized method: ${message.action}`);
-      }
-    } catch (e) {
-      console.warn('Error handling message');
-      console.warn(e);
+      return;
     }
+
+    try {
+      if (parsedData.success == false && this.state.userId == dest_user_id) {
+        throw new Error(parsedData.message);
+      }
+    }
+    catch (e) {
+      Alert.alert("Websocket error : " + e);
+      if (action == "viewer_join_room") {
+        this.ws.dispatchEvent(new Event("error", { error: e }));
+        return
+      }
+    }
+
+    if (dest_user_id && dest_user_id != this.state.userId) {
+      console.log("current user id :", this.state.userId);
+      console.log("dest user id :", dest_user_id);
+      // ignore all messages from oneself
+      return;
+    }
+
+    switch (message.action) {
+      case 'viewer_join_room':
+        console.log(`User ${sessionId} joined room`);
+        // when another user joins, create an RTCPeerConnection and send them an SDP offer
+        await this.createOfferer(src_user_id, dest_user_id, false, remoteScreenSharing, receiver_channel_name);
+        if (this.state.screenShared && !remoteScreenSharing) {
+          // if local screen is being shared
+          // and remote peer is not sharing screen
+          // send offer from screen sharing peer
+          console.log('Creating screen sharing offer.');
+          await this.createOfferer(src_user_id, dest_user_id, false, remoteScreenSharing, receiver_channel_name);
+        }
+        break;
+      case 'new-offer':
+        console.log(`SDP Offer received from ${sessionId}`);
+        // when another user sends an SDP offer, replay with an SDP Answer
+
+        // create new RTCPeerConnection
+        // set offer as remote description
+        var offer = parsedData.sdp;
+        await this.createAnswerer(offer, src_user_id, dest_user_id, localScreenSharing, remoteScreenSharing, receiver_channel_name);
+
+        break;
+      case 'new-answer':
+        // in case of answer to previous offer
+        // get the corresponding RTCPeerConnection
+        var peer = null;
+
+        if (remoteScreenSharing) {
+          // if answerer is screen sharer
+          peer = mapPeers[src_user_id + ' Screen'][0];
+        } else if (localScreenSharing) {
+          // if offerer was screen sharer
+          peer = mapScreenPeers[src_user_id][0];
+        } else {
+          // if both are non-screen sharers
+          peer = mapPeers[src_user_id][0];
+        }
+
+        // get the answer
+        var answer = parsedData['sdp'];
+
+        console.log('mapPeers:');
+        for (key in mapPeers) {
+          console.log(key, ': ', mapPeers[key]);
+        }
+
+        console.log('peer: ', peer);
+        console.log('answer: ', answer);
+
+        // set remote description of the RTCPeerConnection
+        peer.setRemoteDescription(answer);
+
+        break;
+      case "chat":
+        if (this.state.userId == src_user_id) {
+          return;
+        }
+        var nodeText = parsedData.username + ": " + parsedData.message
+        break;
+      default:
+        console.warn(`Unrecognized method: ${message.action}`);
+        break;
+
+    }
+
   };
 
 

@@ -20,7 +20,7 @@
             "compileSdkVersion": 33,
             "targetSdkVersion": 33,
             "buildToolsVersion": "33.0.0",
-            "minSdkVersion":24
+            "minSdkVersion":31
           },
           "ios": {
             "deploymentTarget": "13.0"
