@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import CallScreen from './src/screens/CallScreen';
+// import CallScreen from './src/screens/CallScreen';
 import Demo from './src/screens/Demo';
 
 export default function App() {

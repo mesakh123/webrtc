@@ -34,32 +34,37 @@ function Demo() {
     { label: 'streamer', value: 'streamer' },
     { label: 'viewer', value: 'viewer' },
   ];
-  // https://gist.github.com/zziuni/3741933
 
-  const OFFERICESERVERS = [
+  const ICESERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun01.sipphone.com' },
+    { urls: 'stun:stun.ekiga.net' },
+    { urls: 'stun:stun.fwdnet.net' },
+    { urls: 'stun:stun.ideasip.com' },
+    { urls: 'stun:stun.iptel.org' },
+    { urls: 'stun:stun.rixtelecom.se' },
+    { urls: 'stun:stun.schlund.de' },
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
-  ]
-  const ANSWERICESERVERS = [
-
-    {
-      urls: [
-        'stun:stun1.l.google.com:19302',
-        'stun:stun2.l.google.com:19302',
-      ],
-    },
+    { urls: 'stun:stunserver.org' },
+    { urls: 'stun:stun.softjoys.com' },
+    { urls: 'stun:stun.voiparound.com' },
+    { urls: 'stun:stun.voipbuster.com' },
+    { urls: 'stun:stun.voipstunt.com' },
+    { urls: 'stun:stun.voxgratia.org' },
+    { urls: 'stun:stun.xten.com' },
   ]
 
   const [localStream, setLocalStream] = useState(null);
   const [localDisplayStream, setLocalDisplayStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(new Map());
   const [peerConnections, setPeerConnections] = useState([]);
   const [webSocketSessionId, setWebSocketSessionId] = useState(null);
-  const mapPeers = useRef(new Map());
-  const mapScreenPeers = useRef(new Map());
+  const [mapPeers, setMapPeers] = useState(new Map());
+  const [mapScreenPeers, setMapScreenPeers] = useState(new Map());
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [screenShareStream, setScreenShareStream] = useState(null);
@@ -77,6 +82,7 @@ function Demo() {
   const webSocket = useRef(null);
   const [alertText, setAlertText] = useState(null);
   const [message, setMessage] = useState(null);
+  const [streamerId, setStreamerId] = useState(4);//todo: fixme
   const messageList = useRef([]);
   const getPeers = (peerStorageObj) => {
     var peers = [];
@@ -169,18 +175,11 @@ function Demo() {
     })
   };
 
-  const setOnTrack = async (peer) => {
-    var mediaStream = new MediaStream();
-    setRemoteStream(mediaStream);
-    peer.ontrack = async (event) => {
-      event.streams[0].getTracks().forEach(track => {
-        console.log('Adding track: ', track);
-        mediaStream.addTrack(track);
-      });
-    };
+  const setOnTrack = (peer, srcPeerUserId) => {
+
     peer.onaddstream = event => {
-      setRemoteStream(event.stream);
-    };
+      setRemoteStream(new Map([[srcPeerUserId, event.stream]]))
+    }
   }
 
   const mappingOfferPeerConnection = (srcPeerUserId, localScreenSharing, remoteScreenSharing, peerConnection, dc) => {
@@ -190,23 +189,23 @@ function Demo() {
 
       // store the RTCPeerConnection
       // and the corresponding RTCDataChannel
-      currentMapPeers = mapPeers.current.set(srcPeerUserId, [peerConnection, dc])
+      currentMapPeers = mapPeers.set(srcPeerUserId, [peerConnection, dc])
       peerConnection.oniceconnectionstatechange = () => {
         var iceConnectionState = peerConnection.iceConnectionState;
         if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
-          console.log('Deleting peer');
+          console.log('Deleting peer ', peerConnection);
           currentMapPeers.delete(srcPeerUserId)
           if (iceConnectionState != 'closed') {
             peerConnection.close();
           }
         }
       };
-      mapPeers.current = new Map(currentMapPeers)
+      setMapPeers(new Map(currentMapPeers))
     }
     else if (!localScreenSharing && remoteScreenSharing) {
       // answerer is screen sharing
 
-      currentMapPeers = mapPeers.current.set(srcPeerUserId + ' Screen', [peerConnection, dc])
+      currentMapPeers = mapPeers.set(srcPeerUserId + ' Screen', [peerConnection, dc])
 
       peerConnection.oniceconnectionstatechange = () => {
         var iceConnectionState = peerConnection.iceConnectionState;
@@ -217,11 +216,11 @@ function Demo() {
           }
         }
       };
-      mapPeers.current = new Map(currentMapPeers)
+      setMapPeers(new Map(currentMapPeers))
 
     }
     else {
-      currentMapPeers = mapScreenPeers.current.set(srcPeerUserId, [peerConnection, dc])
+      currentMapPeers = mapScreenPeers.set(srcPeerUserId, [peerConnection, dc])
       peerConnection.oniceconnectionstatechange = () => {
         var iceConnectionState = peerConnection.iceConnectionState;
         if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
@@ -231,7 +230,7 @@ function Demo() {
           }
         }
       };
-      mapScreenPeers.current = new Map(currentMapPeers)
+      setMapScreenPeers(new Map(currentMapPeers))
     }
   };
 
@@ -243,30 +242,19 @@ function Demo() {
       // add user media tracks
 
       peer.addStream(localStream);
-      localStream.getTracks().forEach(track => {
-        console.log('Adding localStream tracks.');
-        peer.getLocalStreams()[0].addTrack(track);
-      });
       return;
     }
 
     // if it is a screen sharing peer
     // add display media tracks
     peer.addStream(localDisplayStream);
-    localDisplayStream.getTracks().forEach(track => {
-      console.log('Adding localStream tracks.');
-      peer.getLocalStreams()[0].addTrack(track);
-    });
 
   }
 
 
   const createOfferer = (srcPeerUserId, destPeerUserId, localScreenSharing, remoteScreenSharing, receiver_channel_name) => {
     console.log("Create offerer " + srcPeerUserId + " to " + destPeerUserId);
-    const peerConnection = new RTCPeerConnection({
-      iceservers: OFFERICESERVERS,
-      iceCandidatePoolSize: 10,
-    });
+    const peerConnection = new RTCPeerConnection({ iceservers: ICESERVERS });
 
     addLocalTracks(peerConnection, localScreenSharing);
 
@@ -303,8 +291,6 @@ function Demo() {
       .then(function (event) {
         console.log("Local Description Set successfully.");
       });
-      console.log("mapScreenPeers :",mapScreenPeers.current);
-      console.log("mapPeers :",mapPeers.current);
 
   }
 
@@ -313,8 +299,8 @@ function Demo() {
       // if none are sharing screens (normal operation)
 
       // it will have an RTCDataChannel
-      var currentMapPeers = mapPeers.current;
-      setOnTrack(peerConnection);
+      var currentMapPeers = mapPeers;
+      setOnTrack(peerConnection, srcPeerUserId);
       peerConnection.ondatachannel = e => {
         console.log('e.channel.label: ', e.channel.label);
         peerConnection.dc = e.channel;
@@ -337,13 +323,12 @@ function Demo() {
           }
         }
       };
-      mapPeers.current = new Map(currentMapPeers)
-
+      setMapPeers(new Map(currentMapPeers));
     }
     else if (localScreenSharing && !remoteScreenSharing) {
       // answerer itself is sharing screen
 
-      var currentMapPeers = mapScreenPeers.current;
+      var currentMapPeers = mapScreenPeers;
       // it will have an RTCDataChannel
       peerConnection.ondatachannel = e => {
         peerConnection.dc = e.channel;
@@ -366,13 +351,12 @@ function Demo() {
           }
         };
       }
-      mapScreenPeers.current = new Map(currentMapPeers);
-      
+      setMapScreenPeers(new Map(currentMapPeers));
     }
 
     else {
       // offerer is sharing screen
-      var currentMapPeers = mapPeers.current;
+      var currentMapPeers = mapPeers;
       setOnTrack(peerConnection);
       // it will have an RTCDataChannel
       peerConnection.ondatachannel = e => {
@@ -401,16 +385,13 @@ function Demo() {
           }
         }
       };
-      mapPeers.current = new Map(currentMapPeers)
+      setMapPeers(new Map(currentMapPeers));
 
     }
   }
   const createAnswerer = (offer, srcPeerUserId, destPeerUserId, localScreenSharing, remoteScreenSharing, receiver_channel_name) => {
     console.log("Create answerer")
-    const peerConnection = new RTCPeerConnection({
-      iceservers: ANSWERICESERVERS,
-      iceCandidatePoolSize: 10,
-    });
+    const peerConnection = new RTCPeerConnection({ iceservers: ICESERVERS });
 
     // add current local stream
     addLocalTracks(peerConnection)
@@ -475,7 +456,7 @@ function Demo() {
   const receiveNewAnswer = (sdp, src_user_id, localScreenSharing, remoteScreenSharing) => {
     console.log("received new sdp ", sdp);
     var peerKey = src_user_id;
-    var currentMapPeers = mapPeers.current;
+    var currentMapPeers = mapPeers;
     var currentPeerConnection = null;
     var currentPeersDC = null;
     if (remoteScreenSharing) {
@@ -484,7 +465,7 @@ function Demo() {
       currentPeerConnection = currentMapPeers.get(peerKey)[0];
       currentPeersDC = currentMapPeers.get(peerKey)[1];
     } else if (localScreenSharing) {
-      currentMapPeers = mapScreenPeers.current;
+      currentMapPeers = mapScreenPeers;
       currentPeerConnection = currentMapPeers.get(peerKey)[0];
       currentPeersDC = currentMapPeers.get(peerKey)[1];
     } else {
@@ -495,11 +476,10 @@ function Demo() {
     currentPeerConnection.setRemoteDescription(sdp);
     currentMapPeers = currentMapPeers.set(src_user_id, [currentPeerConnection, currentPeersDC])
     if (peerKey == src_user_id) {
-      mapPeers.current = new Map(currentMapPeers)
-
+      setMapPeers(new Map(currentMapPeers));
     }
     else {
-      mapScreenPeers.current = new Map(currentMapPeers);
+      setMapScreenPeers(new Map(currentMapPeers));
 
     }
 
@@ -643,15 +623,14 @@ function Demo() {
 
   const closePeer = async (sessionId) => {
     console.log('closePeer ', sessionId);
-    const peer = mapPeers.current.get(sessionId)[0];
+    const peer = mapPeers.get(sessionId)[0];
     if (peer) {
       peer.close();
     }
-    const peers = mapPeers.current;
+    const peers = mapPeers;
     peers.delete(sessionId);
 
-    mapPeers.current = new Map(peers)
-
+    setMapPeers(peers);
     removeVideo(sessionId);
   };
 
@@ -661,7 +640,7 @@ function Demo() {
     console.log("JoinORLEave ", joinedRoom.current);
     if (joinedRoom.current) {
 
-      [...mapPeers.current.keys()].forEach(async (key) => {
+      [...mapPeers.keys()].forEach(async (key) => {
         try {
           await closePeer(key);
         } catch (e) {
@@ -669,7 +648,7 @@ function Demo() {
         }
       });
 
-      [...mapScreenPeers.current.keys()].forEach(async (key) => {
+      [...mapScreenPeers.keys()].forEach(async (key) => {
         try {
           await closePeer(key);
         } catch (e) {
@@ -734,11 +713,16 @@ function Demo() {
                 <Text style={styles.label}>Streamer Video</Text>
                 {
                   remoteStream ? (
-                    <RTCView
-                      objectFit={'cover'}
-                      style={{ flex: 1, backgroundColor: '#050A0E', height: 50 }}
-                      streamURL={remoteStream.toURL()}
-                    />
+                    [...remoteStream.keys()].forEach(async (key) => {
+                      {
+                        key == streamerId ? (<RTCView
+                          objectFit={'cover'}
+                          style={{ flex: 1, backgroundColor: '#050A0E', height: 50 }}
+                          key={key}
+                          streamURL={remoteStream.get(key).toURL()}
+                        />) : null
+                      }
+                    })
                   ) : null
                 }
               </>

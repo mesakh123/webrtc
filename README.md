@@ -30,3 +30,15 @@ mkdir android/app/src/main/assets/ && react-native bundle --platform android --d
 cd android
 
 gradlew assembleDebug
+
+android/build.gradle
+subprojects { subproject ->
+    afterEvaluate{
+        if((subproject.plugins.hasPlugin('android') || subproject.plugins.hasPlugin('android-library'))) {
+            android {
+                compileSdkVersion rootProject.ext.compileSdkVersion
+                buildToolsVersion rootProject.ext.buildToolsVersion
+            }
+        }
+    }
+}
