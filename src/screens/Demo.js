@@ -303,8 +303,8 @@ function Demo() {
       .then(function (event) {
         console.log("Local Description Set successfully.");
       });
-      console.log("mapScreenPeers :",mapScreenPeers.current);
-      console.log("mapPeers :",mapPeers.current);
+    console.log("mapScreenPeers :", mapScreenPeers.current);
+    console.log("mapPeers :", mapPeers.current);
 
   }
 
@@ -367,7 +367,7 @@ function Demo() {
         };
       }
       mapScreenPeers.current = new Map(currentMapPeers);
-      
+
     }
 
     else {
