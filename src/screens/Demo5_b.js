@@ -120,7 +120,7 @@ function Demo5() {
             // store the RTCPeerConnection
             // and the corresponding RTCDataChannel
             currentMapPeers = mapPeers.current.set(srcPeerUserId, [peerConnection, dc])
-            setOnTrack(peerConnection, srcPeerUserId);
+            setOnTrack(peerConnection, false);
             peerConnection.oniceconnectionstatechange = () => {
                 var iceConnectionState = peerConnection.iceConnectionState;
                 if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
@@ -137,7 +137,7 @@ function Demo5() {
             // answerer is screen sharing
 
             currentMapPeers = mapPeers.current.set(srcPeerUserId + ' Screen', [peerConnection, dc])
-            setOnTrack(peerConnection, srcPeerUserId);
+            setOnTrack(peerConnection, true);
             peerConnection.oniceconnectionstatechange = () => {
                 var iceConnectionState = peerConnection.iceConnectionState;
                 if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
@@ -153,7 +153,7 @@ function Demo5() {
         else {
             currentMapPeers = mapScreenPeers.current.set(srcPeerUserId, [peerConnection, dc])
 
-            setOnTrack(peerConnection, srcPeerUserId);
+            setOnTrack(peerConnection, false);
 
             peerConnection.oniceconnectionstatechange = () => {
                 var iceConnectionState = peerConnection.iceConnectionState;
@@ -231,8 +231,23 @@ function Demo5() {
 
     }
     const setOnTrack = async (peer, remoteScreenSharing) => {
+        if (!remoteScreenSharing) {
+            var mediaStream = new MediaStream();
+            setRemoteStream(mediaStream);
+            peer.ontrack = async (event) => {
+                event.streams[0].getTracks().forEach(track => {
+                    console.log('Adding track: ', track);
+                    mediaStream.addTrack(track);
+                });
+            };
+            peer.onaddstream = event => {
+                console.log("set remote stream")
+                setRemoteStream(event.stream);
+            };
+            return;
+        }
         var mediaStream = new MediaStream();
-        setRemoteStream(mediaStream);
+        localDisplayStream.current = mediaStream;
         peer.ontrack = async (event) => {
             event.streams[0].getTracks().forEach(track => {
                 console.log('Adding track: ', track);
@@ -241,7 +256,7 @@ function Demo5() {
         };
         peer.onaddstream = event => {
             console.log("set remote stream")
-            setRemoteStream(event.stream);
+            localDisplayStream.current=event.stream;
         };
         // peer.onaddstream = event => {
 
@@ -262,7 +277,7 @@ function Demo5() {
 
             // it will have an RTCDataChannel
             var currentMapPeers = mapPeers.current;
-            setOnTrack(peerConnection, srcPeerUserId);
+            setOnTrack(peerConnection, true);
             peerConnection.ondatachannel = e => {
                 console.log('e.channel.label: ', e.channel.label);
                 peerConnection.dc = e.channel;
@@ -321,7 +336,7 @@ function Demo5() {
         else {
             // offerer is sharing screen
             var currentMapPeers = mapPeers.current;
-            setOnTrack(peerConnection, remoteScreenSharing);
+            setOnTrack(peerConnection, true);
             // it will have an RTCDataChannel
             peerConnection.ondatachannel = e => {
                 peerConnection.dc = e.channel;
