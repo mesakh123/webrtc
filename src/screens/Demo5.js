@@ -33,6 +33,8 @@ function Demo5() {
     const [localStream, setLocalStream] = useState(null);
     const [localDisplayStream, setLocalDisplayStream] = useState(null);
     const remoteStreams = useRef(new Map());
+    const [remoteStream, setRemoteStream] = useState(null);
+
     const [peerConnections, setPeerConnections] = useState([]);
     const [audioEnabled, setAudioEnabled] = useState(true);
     const [videoEnabled, setVideoEnabled] = useState(true);
@@ -158,6 +160,10 @@ function Demo5() {
         }
     };
 
+    const dcOnMessage = (event) => {
+        var message = event.data;
+        Alert.alert(srcPeerUserId, message)
+    }
 
     const createOffer = async (peerUserId, localScreenSharing, remoteScreenSharing, receiver_channel_name) => {
         // Create RTCPeerConnection
@@ -170,7 +176,7 @@ function Demo5() {
 
         addLocalTracks(peerConnection, localScreenSharing);
         var dataChannel = peerConnection.createDataChannel("channel");
-
+        dataChannel.onmessage = dcOnMessage;
         // Add local media stream to RTCPeerConnection
 
         console.log("addlocaltrack start")
@@ -210,34 +216,35 @@ function Demo5() {
         // Create and send offer
         peerConnection.createOffer().then(
             offer => peerConnection.setLocalDescription(offer)
-        );
+        )
+            .then(function (event) {
+                console.log("Local Description Set successfully.");
+            });
 
-        setPeerConnections(prevConnections => [
-            ...prevConnections,
-            { peerUserId, peer: peerConnection },
-        ]);
     }
     const setOnTrack = async (peer, srcUserId) => {
         var mediaStream = new MediaStream();
-
+        setRemoteStream(mediaStream);
         peer.ontrack = async (event) => {
             event.streams[0].getTracks().forEach(track => {
                 console.log('Adding track: ', track);
                 mediaStream.addTrack(track);
             });
-
-            var currentMap = remoteStreams.current;
-            currentMap = currentMap.set(srcUserId, mediaStream)
-            remoteStreams.current = new Map(currentMap);
         };
         peer.onaddstream = event => {
-
-            console.log("before remoteStreams", remoteStreams.current)
-            var currentMap = remoteStreams.current;
-            currentMap = currentMap.set(srcUserId, event.stream);
-            remoteStreams.current = new Map(currentMap);
-            console.log("after remotestream", remoteStreams.current);
+            console.log("set remote stream")
+            setRemoteStream(event.stream);
         };
+        // peer.onaddstream = event => {
+
+        //     console.log("before remoteStreams", remoteStreams.current)
+        //     var currentMap = remoteStreams.current;
+
+        //     currentMap = currentMap.set(srcUserId, event.stream);
+
+        //     remoteStreams.current = new Map(currentMap);
+        //     console.log("after remoteStreams", remoteStreams.current);
+        // };
     }
 
     const mappingAnswerPeerConnection = (srcPeerUserId, localScreenSharing, remoteScreenSharing, peerConnection) => {
@@ -495,10 +502,16 @@ function Demo5() {
         }
 
         else if (action == "new-answer") {
-            console.log("Receive new answer for user " + peerUserId + "with receiver_channel_name" + receiver_channel_name)
+            console.log("Receive new answer from user " + peerUserId + "with receiver_channel_name" + receiver_channel_name)
 
             receiveNewAnswer(parsedData.message.sdp, peerUserId, localScreenSharing, remoteScreenSharing);
 
+            return;
+        }
+        else if (action=="chat"){
+
+            var comingMessage = parsedData.message.message;
+            Alert.alert(comingMessage);
             return;
         }
 
@@ -627,6 +640,7 @@ function Demo5() {
     }
 
     const sendSignal = (action, message) => {
+        console.log("Websocket.current", webSocket.current)
         webSocket.current.send(
             JSON.stringify(
                 {
@@ -638,15 +652,14 @@ function Demo5() {
         )
     };
 
-    const sendMesage = (message) => {
-        console.log("mapPeers", mapPeers);
-        if (mapPeers) {
-            [...mapPeers.current.keys()].forEach(key => {
-                var dataChannel = mapPeers.current.get(key)[1];
-                dataChannel.send(message);
-            });
+    const sendMesage = () => {
+        if(!message){
+            return;
         }
-
+        sendSignal("chat",{
+            "message": userId.current + ":"+message
+        })
+        setMessage(null);
     }
 
 
@@ -659,19 +672,25 @@ function Demo5() {
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
                     <View style={[styles.flex, styles.borderedContainer]}>
                         {
-                            remoteStreams.current ? (
-                                [...remoteStreams.current.keys()].map(key => {
-                                    <RTCView
-                                        key={key}
-                                        style={{ flex: 1, backgroundColor: '#050A0E', height: 50 }}
-                                        objectFit={'cover'}
-                                        streamURL={remoteStreams.current.get(key).stream.toURL()} />
-
-                                })
+                            remoteStreams.current ? ([...remoteStreams.current.keys()].forEach((key)=>{
+                                <RTCView
+                                    objectFit={'cover'}
+                                    style={{ flex: 1, backgroundColor: '#050A0E', height: 50 }}
+                                    streamURL={remoteStreams.current.get(key).toURL()}
+                                />
+                            })
+                                
                             ) : null
                         }
-                        {/* 
 
+{
+                            remoteStream ? (<RTCView
+                                style={{ flex: 1, backgroundColor: '#050A0E', height: 50 }}
+
+                                objectFit={'cover'}
+                                streamURL={remoteStream.toURL()}
+                            />) : null
+                        }
                         {
                             localStream ? (<RTCView
                                 style={{ flex: 1, backgroundColor: '#050A0E', height: 50 }}
@@ -679,7 +698,7 @@ function Demo5() {
                                 objectFit={'cover'}
                                 streamURL={localStream.toURL()}
                             />) : null
-                        } */}
+                        }
 
 
                     </View>
@@ -693,13 +712,13 @@ function Demo5() {
                                 />
                             ) : (
 
-                                <>
+                                mapPeers.current ? <>
 
                                     <Text style={styles.label}>
                                         Chat
                                     </Text>
                                     <TextInput
-                                        onChangeText={(msg) => { setMessage(msg) }}
+                                        onChangeText={msg => setMessage(msg)}
                                         placeholder={'message'}
                                         // onSubmitEditing={this.joinOrLeaveRoom}
                                         // returnKeyType={'join'}
@@ -710,7 +729,7 @@ function Demo5() {
                                         onPress={sendMesage}
                                         title='Send'
                                     ></Button>
-                                </>
+                                </> : null
 
                             )
                         }

@@ -32,6 +32,8 @@ cd android
 gradlew assembleDebug
 
 android/build.gradle
+
+```
 subprojects { subproject ->
     afterEvaluate{
         if((subproject.plugins.hasPlugin('android') || subproject.plugins.hasPlugin('android-library'))) {
@@ -42,3 +44,4 @@ subprojects { subproject ->
         }
     }
 }
+```
