@@ -57,22 +57,22 @@ function Demo7() {
     const webSocket = useRef(null);
     const startNoti = async () => {
         try {
-          let channelId = await notifee.createChannel({
-            id: 'default',
-            name: 'Default Channel',
-          });
-          await notifee.displayNotification({
-            title: '屏幕录制中...',
-            body: '在应用中手动关闭该通知',
-            android: {
-              channelId,
-              asForegroundService: true, // 通知作为前台服务，必填
-            },
-          });
+            let channelId = await notifee.createChannel({
+                id: 'default',
+                name: 'Default Channel',
+            });
+            await notifee.displayNotification({
+                title: '屏幕录制中...',
+                body: '在应用中手动关闭该通知',
+                android: {
+                    channelId,
+                    asForegroundService: true, // 通知作为前台服务，必填
+                },
+            });
         } catch (err) {
-          console.error('前台服务启动异常：', err);
+            console.error('前台服务启动异常：', err);
         }
-      };
+    };
 
     const addLocalTracks = (peer, localScreenSharing) => {
         if (!localScreenSharing) {
@@ -282,11 +282,11 @@ function Demo7() {
         peer.onaddstream = event => {
             remoteStreams.current.set(srcPeerUserId, event.stream);
             if (isRemoteDisplayStream) {
-                console.log("share screen event stream",event.stream);
+                console.log("share screen event stream", event.stream);
                 setRemoteDisplayStream(event.stream);
             } else {
-                
-                console.log("share video event stream",event.stream);
+
+                console.log("share video event stream", event.stream);
                 setRemoteStream(event.stream);
             }
 
@@ -680,7 +680,7 @@ function Demo7() {
             track.enabled = true;
         });
 
-        if(mapScreenPeers.current){
+        if (mapScreenPeers.current) {
             mapPeers.forEach()
         }
 
@@ -785,15 +785,7 @@ function Demo7() {
                         } */}
 
                         <>
-                            {
-                                remoteStream ? (<>
-                                    <Text>Remote stream</Text>
-                                    <RTCView
-                                        objectFit={'cover'}
-                                        style={{ flex: 1, backgroundColor: '#050A0E', height: 50 }}
-                                        streamURL={remoteStream.toURL()}
-                                    /></>) : null
-                            }
+
                             {remoteDisplayStream ? (<>
                                 <Text>Remote display stream</Text>
                                 <RTCView
@@ -801,7 +793,20 @@ function Demo7() {
                                     style={{ flex: 1, backgroundColor: '#050A0E', height: 50 }}
                                     streamURL={remoteDisplayStream.toURL()}
                                 />
-                            </>) : null
+                            </>) : (
+
+                                <>
+                                    {
+                                        remoteStream ? (<>
+                                            <Text>Remote stream</Text>
+                                            <RTCView
+                                                objectFit={'cover'}
+                                                style={{ flex: 1, backgroundColor: '#050A0E', height: 50 }}
+                                                streamURL={remoteStream.toURL()}
+                                            /></>) : null
+                                    }
+                                </>
+                            )
 
                             }</>
                     </View>
