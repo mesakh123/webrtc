@@ -45,3 +45,17 @@ subprojects { subproject ->
     }
 }
 ```
+
+
+android/build.gradle
+
+```
+       
+        maven {
+            url "$rootDir/../node_modules/@notifee/react-native/android/libs"
+        }
+
+```
+
+https://segmentfault.com/a/1190000043171940#item-5
+https://github.com/galaxy-s10/billd-live-react-native/tree/master/src

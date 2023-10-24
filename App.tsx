@@ -6,11 +6,13 @@ import Demo from './src/screens/Demo';
 import Demo5 from './src/screens/Demo5';
 import Demo6 from './src/screens/Demo6';
 
+import Demo7 from './src/screens/Demo7';
+
 export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
-      <Demo6 />
+      <Demo7 />
     </SafeAreaView>
   );
 }
