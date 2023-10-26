@@ -45,7 +45,6 @@ function Demo7() {
   const [isJoin, setIsJoin] = useState(false);
   const [message, setMessage] = useState(null);
   const [isFrontCamera, setIsFrontCamera] = useState(false);
-
   const userId = useRef(uuid.v4());
   const mapPeers = useRef(new Map());
   const mapScreenPeers = useRef(new Map());
@@ -98,24 +97,196 @@ function Demo7() {
     });
     console.log("addLocalTracks localDisplayStream finished");
   };
-  const OFFERICESERVERS = [
+
+  const SERVERLIST = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
+    { urls: "stun.ekiga.net" },
+    { urls: "stun.ideasip.com" },
+    { urls: "stun.rixtelecom.se" },
+    { urls: "stun.schlund.de" },
+    { urls: "stun.stunprotocol.org:3478" },
+    { urls: "stun.voiparound.com" },
+    { urls: "stun.voipbuster.com" },
+    { urls: "stun.voipstunt.com" },
+    { urls: "stun.voxgratia.org" },
     {
-      urls: "turn:194.5.157.135:3478",
-      username: "admin",
-      credential: "Asdf#45214521",
+      urls: "stun:freeturn.net:3478",
+    },
+    {
+      urls: "stun:freeturn.net:5349",
+    },
+    {
+      urls: "turn:freeturn.net:3478",
+      username: "free",
+      credential: "free",
+    },
+
+    {
+      urls: "turns:freeturn.net:5349",
+      username: "free",
+      credential: "free",
+    },
+
+    { urls: "stun:stun.relay.metered.ca:80" },
+    {
+      credential: "eFD2V65kF3b04lXG",
+      urls: "turn:a.relay.metered.ca:80",
+      username: "efd7e25209beee9eca3d6ef9",
+    },
+    {
+      credential: "eFD2V65kF3b04lXG",
+      urls: "turn:a.relay.metered.ca:80?transport=tcp",
+      username: "efd7e25209beee9eca3d6ef9",
+    },
+    {
+      credential: "eFD2V65kF3b04lXG",
+      urls: "turn:a.relay.metered.ca:443",
+      username: "efd7e25209beee9eca3d6ef9",
+    },
+    {
+      credential: "eFD2V65kF3b04lXG",
+      urls: "turn:a.relay.metered.ca:443?transport=tcp",
+      username: "efd7e25209beee9eca3d6ef9",
+    },
+
+    {
+      urls: "stun:stun.relay.metered.ca:80",
+    },
+    {
+        urls: [
+          "stun:stun1.l.google.com:19302",
+          "stun:a.relay.metered.ca:80",
+          "stun:stun2.l.google.com:19302",
+          "stun:stun3.l.google.com:19302",
+          "stun:stun4.l.google.com:19302",
+          "stun:stun.freevoipdeal.com:3478",
+          "stun:bn-turn1.xirsys.com",
+        ],
+      },
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+      {
+        url: "turn:numb.viagenie.ca",
+        credential: "muazkh",
+        username: "webrtc@live.com",
+      },
+      {
+        url: "turn:turn.bistri.com:80",
+        credential: "homeo",
+        username: "homeo",
+      },
+      {
+        url: "turn:turn.anyfirewall.com:443?transport=tcp",
+        credential: "webrtc",
+        username: "webrtc",
+      },
+      {
+        urls: "turn:a.relay.metered.ca:80",
+        username: "69af939fef256835a4f3b00e",
+        credential: "lbUFDSyF6j3MVZLd",
+      },
+      {
+        urls: "turn:a.relay.metered.ca:80?transport=tcp",
+        username: "69af939fef256835a4f3b00e",
+        credential: "lbUFDSyF6j3MVZLd",
+      },
+      {
+        urls: "turn:a.relay.metered.ca:443",
+        username: "69af939fef256835a4f3b00e",
+        credential: "lbUFDSyF6j3MVZLd",
+      },
+      {
+        urls: "turn:a.relay.metered.ca:443?transport=tcp",
+        username: "69af939fef256835a4f3b00e",
+        credential: "lbUFDSyF6j3MVZLd",
+      },
+      {
+        username:
+          "UEK79BUzSp4OBBEUMDCHPTGOTKJbUueRyfOjjzNVot4LG9RZpoBOZqdaAzCMek32AAAAAGRpDz92ZW5rYXQxMjM=",
+        credential: "e4a7926a-f73a-11ed-9f71-0242ac140004",
+        urls: [
+          "turn:bn-turn1.xirsys.com:80?transport=udp",
+          "turn:bn-turn1.xirsys.com:3478?transport=udp",
+          "turn:bn-turn1.xirsys.com:80?transport=tcp",
+          "turn:bn-turn1.xirsys.com:3478?transport=tcp",
+          "turns:bn-turn1.xirsys.com:443?transport=tcp",
+          "turns:bn-turn1.xirsys.com:5349?transport=tcp",
+        ],
+      },
+    {
+        url: 'stun:global.stun.twilio.com:3478?transport=udp',
+        urls: 'stun:global.stun.twilio.com:3478?transport=udp',
+      },
+    {
+      url: "turn:numb.viagenie.ca",
+      credential: "muazkh",
+      username: "webrtc@live.com",
     },
   ];
 
-  const ANSWERICESERVERS = [
-    {
-      urls: "turn:194.5.157.135:3478",
-      username: "admin",
-      credential: "Asdf#45214521",
-    },
-  ];
+  const [OFFERICESERVERS, setOfferIceServers] = useState(SERVERLIST);
+  const [ANSWERICESERVERS, setAnswerIceServers] = useState(SERVERLIST);
+
+  //   const ANSWERICESERVERS = [
+  //     // { urls: "stun:stun.l.google.com:19302" },
+  //     // { urls: "stun:stun1.l.google.com:19302" },
+  //     // { urls: "stun:stun2.l.google.com:19302" },
+  //     // { urls: "stun:stun3.l.google.com:19302" },
+  //     // { urls: "stun:stun4.l.google.com:19302" },
+  //     // { urls: "stun.ekiga.net" },
+  //     // { urls: "stun.ideasip.com" },
+  //     // { urls: "stun.rixtelecom.se" },
+  //     // { urls: "stun.schlund.de" },
+  //     // { urls: "stun.stunprotocol.org:3478" },
+  //     // { urls: "stun.voiparound.com" },
+  //     // { urls: "stun.voipbuster.com" },
+  //     // { urls: "stun.voipstunt.com" },
+  //     // { urls: "stun.voxgratia.org" },
+  //     {
+  //         urls: "stun:freeturn.net:3478",
+  //       },
+  //       // {
+  //       //   urls: "stun:freeturn.net:5349",
+  //       // },
+  //       {
+  //         urls: "turn:freeturn.net:3478",
+  //         username: "free",
+  //         credential: "free",
+  //       },
+  //     // {
+  //     //   urls: "turns:freeturn.net:5349",
+  //     //   username: "free",
+  //     //   credential: "free",
+  //     // },
+  //   ];
   useEffect(() => {
     // Get local media stream
     connectDevices();
+    // fetch(
+    //   "https://mesakturn.metered.live/api/v1/turn/credentials?apiKey=408e969527d3fc0d8131030d073410b45a81"
+    // )
+    //   .then((response) => response.json())
+    //   .then((data) => {
+    //     console.log("IceData ", data);
+    //     var data = [
+    //       { urls: "stun:stun.relay.metered.ca:80" },
+    //       {
+    //         credential: "eFD2V65kF3b04lXG",
+    //         urls: "turn:a.relay.metered.ca:80",
+    //         username: "efd7e25209beee9eca3d6ef9",
+    //       },
+    //     ];
+    //     setOfferIceServers(SERVERLIST);
+    //     setAnswerIceServers(SERVERLIST);
+    //   })
+    //   .catch((error) => console.error(error));
   }, []);
 
   const mappingOfferPeerConnection = (
@@ -126,7 +297,7 @@ function Demo7() {
     dataChannel
   ) => {
     var currentMapPeers = null;
-
+    var usedMapUserId = srcPeerUserId;
     if (!localScreenSharing && !remoteScreenSharing) {
       dataChannel.onmessage = dcOnMessage;
       setOnTrack(peerConnection, srcPeerUserId, false);
@@ -164,10 +335,14 @@ function Demo7() {
       // answerer is screen sharing
 
       var newMapPeersKey = srcPeerUserId + " Screen";
+      usedMapUserId = newMapPeersKey;
+      
       currentMapPeers = mapPeers.current.set(newMapPeersKey, [
         peerConnection,
         dataChannel,
       ]);
+
+
       var newSrcPeerUserId = srcPeerUserId + "-screen";
       setOnTrack(peerConnection, newSrcPeerUserId, true);
       peerConnection.oniceconnectionstatechange = () => {
@@ -213,6 +388,7 @@ function Demo7() {
       };
       mapScreenPeers.current = new Map(currentMapPeers);
     }
+    return usedMapUserId;
   };
 
   const dcOnMessage = (event) => {
@@ -237,7 +413,7 @@ function Demo7() {
     dataChannel.onopen = () => {
       console.log("Connection opened.");
     };
-    mappingOfferPeerConnection(
+    const targetPeerId = mappingOfferPeerConnection(
       peerUserId,
       localScreenSharing,
       remoteScreenSharing,
@@ -247,14 +423,16 @@ function Demo7() {
 
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
+        // peerConnection.addIceCandidate(event.candidate);
         return;
       }
-      sendSignal("new-offer", {
-        sdp: peerConnection.localDescription,
-        receiver_channel_name: receiver_channel_name,
-        local_screen_sharing: localScreenSharing,
-        remote_screen_sharing: remoteScreenSharing,
-      });
+        sendSignal("new-offer", {
+          sdp: peerConnection.localDescription,
+          receiver_channel_name: receiver_channel_name,
+          local_screen_sharing: localScreenSharing,
+          // candidate:candidate,
+          remote_screen_sharing: remoteScreenSharing,
+        });
     };
 
     // Create and send offer
@@ -306,6 +484,7 @@ function Demo7() {
     peerConnection
   ) => {
     console.log("Start mapping answer");
+    var usedMapUserId = srcPeerUserId;
     if (!localScreenSharing && !remoteScreenSharing) {
       // if none are sharing screens (normal operation)
 
@@ -330,6 +509,7 @@ function Demo7() {
 
       peerConnection.oniceconnectionstatechange = () => {
         var iceConnectionState = peerConnection.iceConnectionState;
+        console.log("ICE state", iceConnectionState);
         if (
           iceConnectionState === "failed" ||
           iceConnectionState === "disconnected" ||
@@ -380,6 +560,8 @@ function Demo7() {
     } else {
       // offerer is sharing screen
       var newMapPeersKey = srcPeerUserId + " Screen";
+      usedMapUserId = newMapPeersKey;
+
       var currentMapPeers = mapPeers.current;
       var newSrcPeerUserId = srcPeerUserId + "-screen";
       setOnTrack(peerConnection, newSrcPeerUserId, true);
@@ -426,6 +608,7 @@ function Demo7() {
       };
       mapPeers.current = new Map(currentMapPeers);
     }
+    return usedMapUserId;
   };
   const createAnswer = async (
     offer,
@@ -443,7 +626,7 @@ function Demo7() {
     // Add local media stream to RTCPeerConnection
     addLocalTracks(peerConnection, localScreenSharing);
 
-    mappingAnswerPeerConnection(
+    const candidate_peer = mappingAnswerPeerConnection(
       peerUserId,
       localScreenSharing,
       remoteScreenSharing,
@@ -451,13 +634,15 @@ function Demo7() {
     );
 
     // Handle incoming ICE candidates
-    peerConnection.onicecandidate = (e) => {
-      if (e.candidate) {
-        // socket.emit("ice candidate", e.candidate, id);
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        // peerConnection.addIceCandidate(event.candidate);
+        // setCandidate(event.candidate);
         return;
       }
       sendSignal("new-answer", {
         sdp: peerConnection.localDescription,
+        // candidate:candidate,
         receiver_channel_name: receiver_channel_name,
         local_screen_sharing: localScreenSharing,
         remote_screen_sharing: remoteScreenSharing,
