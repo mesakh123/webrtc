@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@expo/config-plugins": "^7.2.5",
+    "@notifee/react-native": "5",
     "@react-native-community/cli": "^11.3.9",
     "broadwayjs": "^0.0.2",
     "chokidar": "^3.5.3",

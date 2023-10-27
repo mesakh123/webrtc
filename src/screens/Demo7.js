@@ -14,7 +14,7 @@ import {
     NativeEventEmitter,
     FlatList,
 } from 'react-native';
-
+import notifee from '@notifee/react-native';
 import {
     RTCView,
     RTCPeerConnection,
@@ -29,9 +29,8 @@ import { Dropdown } from 'react-native-element-dropdown';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 
 import io from "socket.io-client";
-import VIForegroundService from '@voximplant/react-native-foreground-service';
 
-function Demo6() {
+function Demo7() {
     const [localStream, setLocalStream] = useState(null);
     // const [localDisplayStream, setLocalDisplayStream] = useState(null);
     const localDisplayStream = useRef(null);
@@ -55,7 +54,24 @@ function Demo6() {
 
     const wsEndPoint = "wss://mango-live.website/ws/test-live-room/"
     const webSocket = useRef(null);
-
+    const startNoti = async () => {
+        try {
+          let channelId = await notifee.createChannel({
+            id: 'default',
+            name: 'Default Channel',
+          });
+          await notifee.displayNotification({
+            title: '屏幕录制中...',
+            body: '在应用中手动关闭该通知',
+            android: {
+              channelId,
+              asForegroundService: true, // 通知作为前台服务，必填
+            },
+          });
+        } catch (err) {
+          console.error('前台服务启动异常：', err);
+        }
+      };
 
     const addLocalTracks = (peer, localScreenSharing) => {
         if (!localScreenSharing) {
@@ -583,6 +599,7 @@ function Demo6() {
     };
 
     const startScreenSharingService = async () => {
+        await startNoti();
         await mediaDevices.getDisplayMedia({ audio: true, video: true })
             .then(stream => {
                 localDisplayStream.current = stream
@@ -661,6 +678,10 @@ function Demo6() {
         localStream.getTracks().forEach(track => {
             track.enabled = true;
         });
+
+        if(mapScreenPeers.current){
+            mapPeers.forEach()
+        }
 
     };
 
@@ -852,4 +873,4 @@ function Demo6() {
 
 }
 
-export default Demo6;
+export default Demo7;

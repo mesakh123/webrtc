@@ -130,7 +130,6 @@ function Demo6() {
                 if (iceConnectionState === "failed" || iceConnectionState === "disconnected" || iceConnectionState === "closed") {
                     console.log('Deleting peer ', peerConnection);
                     currentMapPeers.delete(srcPeerUserId)
-                    console.log("currentmappeers dleet")
                     if (iceConnectionState != 'closed') {
                         peerConnection.close();
                     }
@@ -169,6 +168,7 @@ function Demo6() {
         else {
             currentMapPeers = mapScreenPeers.current.set(srcPeerUserId, [peerConnection, dataChannel])
 
+            setOnTrack(peerConnection, srcPeerUserId, false);
 
             peerConnection.oniceconnectionstatechange = () => {
                 var iceConnectionState = peerConnection.iceConnectionState;
@@ -265,11 +265,8 @@ function Demo6() {
         peer.onaddstream = event => {
             remoteStreams.current.set(srcPeerUserId, event.stream);
             if (isRemoteDisplayStream) {
-                console.log("share screen event stream",event.stream);
                 setRemoteDisplayStream(event.stream);
             } else {
-                
-                console.log("share video event stream",event.stream);
                 setRemoteStream(event.stream);
             }
 
@@ -586,14 +583,14 @@ function Demo6() {
         await mediaDevices.getDisplayMedia({ audio: true, video: true })
             .then(stream => {
                 localDisplayStream.current = stream
-                // if (localStream) {
-                //     localStream.getTracks().forEach(track => {
-                //         track.enabled = false;
-                //     });
-                //     localDisplayStream.current.getTracks().forEach(track => {
-                //         localStream.addTrack(track);
-                //     });
-                // }
+                if (localStream) {
+                    localStream.getTracks().forEach(track => {
+                        track.enabled = false;
+                    });
+                    localDisplayStream.current.getTracks().forEach(track => {
+                        localStream.addTrack(track);
+                    });
+                }
                 sendSignal("new-peer", {
                     "local_screen_sharing": true
                 })
@@ -601,37 +598,37 @@ function Demo6() {
             });
     }
     const startForegroundService = async () => {
-        // if (Platform.OS !== 'android') {
-        //     // alert('Only Android platform is supported');
-        //     await startBroadcast()
-        //     await startScreenSharingService()
+        if (Platform.OS !== 'android') {
+            // alert('Only Android platform is supported');
+            await startBroadcast()
+            await startScreenSharingService()
 
-        //     return;
-        // }
-        // if (Platform.Version >= 26) {
-        //     const channelConfig = {
-        //         id: 'ForegroundServiceChannel',
-        //         name: 'Notification Channel',
-        //         description: 'Notification Channel for Foreground Service',
-        //         enableVibration: false,
-        //         importance: 2
-        //     };
-        //     await VIForegroundService.createNotificationChannel(channelConfig);
-        // }
-        // const notificationConfig = {
-        //     id: 3456,
-        //     title: 'Foreground Service',
-        //     text: 'Foreground service is running',
-        //     icon: 'ic_notification',
-        //     priority: 2
-        // };
-        // if (Platform.Version >= 26) {
-        //     notificationConfig.channelId = 'ForegroundServiceChannel';
-        // }
-        // VIForegroundService.startService(notificationConfig).then(async () => {
-        //     await startScreenSharingService()
-        // })
-        startScreenSharingService();
+            return;
+        }
+        if (Platform.Version >= 26) {
+            const channelConfig = {
+                id: 'ForegroundServiceChannel',
+                name: 'Notification Channel',
+                description: 'Notification Channel for Foreground Service',
+                enableVibration: false,
+                importance: 2
+            };
+            await VIForegroundService.createNotificationChannel(channelConfig);
+        }
+        const notificationConfig = {
+            id: 3456,
+            title: 'Foreground Service',
+            text: 'Foreground service is running',
+            icon: 'ic_notification',
+            priority: 2
+        };
+        if (Platform.Version >= 26) {
+            notificationConfig.channelId = 'ForegroundServiceChannel';
+        }
+        VIForegroundService.startService(notificationConfig).then(async () => {
+            await startScreenSharingService()
+        })
+
     }
     const startBroadcast = async () => {
         const reactTag = findNodeHandle(screenCaptureView.current);
@@ -639,7 +636,9 @@ function Demo6() {
 
         // return 
     }
-
+    const stopForegroundService = useCallback(() => {
+        VIForegroundService.stopService().catch((err) => err);
+    }, []);
 
     // Function to start screen sharing
     const startScreenShare = async () => {
@@ -661,6 +660,7 @@ function Demo6() {
         localStream.getTracks().forEach(track => {
             track.enabled = true;
         });
+        stopForegroundService();
 
     };
 
