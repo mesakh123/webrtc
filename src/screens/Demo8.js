@@ -78,14 +78,12 @@ function Demo8() {
       // add user media tracks
       peer.addStream(localStream);
       localStream.getTracks().forEach((track) => {
-        console.log("Adding localStream tracks.");
         peer.getLocalStreams()[0].addTrack(track);
       });
       return;
     }
     peer.addStream(localDisplayStream.current);
     localDisplayStream.current.getTracks().forEach((track) => {
-      console.log("Adding localDisplayStream tracks.");
       peer.getLocalStreams()[0].addTrack(track);
     });
   };
@@ -95,11 +93,16 @@ function Demo8() {
     connectDevices();
   }, []);
 
-  const setICEConnectionStateChange = (
-    peerConnection,
-    srcPeerUserId,
-    currentMapPeers
-  ) => {
+  const setICEConnectionStateChange = (peerConnection, newPeerNameInfo) => {
+    var srcPeerUserId = newPeerNameInfo[0];
+    var isMapPeers = newPeerNameInfo[1];
+
+    var currentMapPeers = mapPeers.current;
+
+    if (!isMapPeers) {
+      currentMapPeers = mapScreenPeers.current;
+    }
+
     peerConnection.oniceconnectionstatechange = () => {
       var iceConnectionState = peerConnection.iceConnectionState;
       if (
@@ -109,12 +112,15 @@ function Demo8() {
       ) {
         if (iceConnectionState !== "closed") {
           peerConnection.close();
-          console.log("Deleting peer ", peerConnection);
           currentMapPeers.delete(srcPeerUserId);
-          console.log("currentmappeers delete");
         }
       }
     };
+    if (isMapPeers) {
+      mapPeers.current = new Map(currentMapPeers);
+    } else {
+      mapScreenPeers.current = new Map(currentMapPeers);
+    }
   };
 
   const dcOnMessage = (event) => {
@@ -129,7 +135,6 @@ function Demo8() {
   ) => {
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log("Sending ICE Candidate", event.candidate);
         sendSignal("ICECandidate", {
           ice_candidate: event.candidate,
           receiver_channel_name: receiver_channel_name,
@@ -139,6 +144,34 @@ function Demo8() {
         console.log("All ICE candidates have been sent!!");
       }
     };
+  };
+
+  const mappingOfferPeerConnectionTracks = (
+    peer,
+    peerUserId,
+    localScreenSharing,
+    remoteScreenSharing
+  ) => {
+    const dataChannel = peer.createDataChannel("channel");
+    var peerUsername = peerUserId;
+    var isMapPeer = true;
+    if (!localScreenSharing && !remoteScreenSharing) {
+      // none of the peers are sharing screen (normal operation)
+      // store the RTCPeerConnection
+      // and the corresponding RTCDataChannel
+      mapPeers.current.set(peerUsername, [peer, dataChannel]);
+      setRemoteTracks(peer, peerUserId, false);
+    } else if (!localScreenSharing && remoteScreenSharing) {
+      // answerer is screen sharing
+      peerUsername = peerUsername + " Screen";
+      mapPeers.current.set(peerUsername, [peer, dataChannel]);
+    } else {
+      // offerer itself is sharing screen
+      setRemoteTracks(peer, peerUsername, true);
+      mapScreenPeers.current.set(peerUsername, [peer, dataChannel]);
+      isMapPeer = false;
+    }
+    return [peerUsername, isMapPeer];
   };
 
   const setRemoteTracks = async (
@@ -154,33 +187,25 @@ function Demo8() {
     }
 
     if (isRemoteDisplayStream) {
-      console.log("set track is remote display stream");
       setRemoteDisplayStream(mediaStream);
     } else {
-      console.log("set track is remote stream");
       setRemoteStream(mediaStream);
     }
     peer.ontrack = (event) => {
-      console.log("Adding track: ", event.track);
       mediaStream.addTrack(event.track, mediaStream);
     };
 
     peer.onaddstream = async (event) => {
       remoteStreams.current.set(srcPeerUserId, event.stream);
       if (isRemoteDisplayStream) {
-        console.log("share screen event stream", event.stream);
         setRemoteDisplayStream(event.stream);
       } else {
-        console.log("share video event stream", event.stream);
         setRemoteStream(event.stream);
       }
-
-      console.log("Adding event stream");
     };
   };
 
   const connectDevices = () => {
-    console.log("Get local media");
     // Get local media stream
     mediaDevices.enumerateDevices().then((sourceInfos) => {
       let videoSourceId;
@@ -238,11 +263,36 @@ function Demo8() {
     currentPeerConnection.setRemoteDescription(sdp);
   };
   const iceServers = [
-    { url: "stun:stun.l.google.com:19302" },
+     { urls: "stun:stun4.l.google.com:19302" },
     {
       urls: "turn:freeturn.net:3478",
       username: "free",
       credential: "free",
+    },
+    {
+      urls: "turns:freeturn.net:5349",
+      username: "free",
+      credential: "free",
+    },
+    {
+      urls: "turn:a.relay.metered.ca:80",
+      username: "efd7e25209beee9eca3d6ef9",
+      credential: "eFD2V65kF3b04lXG",
+    },
+    {
+      urls: "turn:a.relay.metered.ca:80?transport=tcp",
+      username: "efd7e25209beee9eca3d6ef9",
+      credential: "eFD2V65kF3b04lXG",
+    },
+    {
+      urls: "turn:a.relay.metered.ca:443",
+      username: "efd7e25209beee9eca3d6ef9",
+      credential: "eFD2V65kF3b04lXG",
+    },
+    {
+      urls: "turn:a.relay.metered.ca:443?transport=tcp",
+      username: "efd7e25209beee9eca3d6ef9",
+      credential: "eFD2V65kF3b04lXG",
     },
   ];
   //Configuration of STUN AND TURN Servers
@@ -257,20 +307,25 @@ function Demo8() {
     });
   };
   //Trickle ICE (Send ICE Candidates to remote peer)
-  function setIceCandidateEvent(peerConnection, receiver_channel_name) {
+  function setIceCandidateEvent(
+    peerConnection,
+    receiver_channel_name,
+    newPeerNameInfo
+  ) {
     //Setting onicecandidate
     //Listen for local ICE candidates on the local RTCPeerConnection
     //Send IceCandidates to peer
+    var isScreen = false;
+    if (!newPeerNameInfo[1]) {
+      isScreen = true;
+    }
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(
-          "Sending ICE Candidate",
-          event.candidate,
-          receiver_channel_name
-        );
+        console.log(userId.current + "Trigger ice candidate");
         sendSignal("ICECandidate", {
           ice_candidate: event.candidate,
           receiver_channel_name: receiver_channel_name,
+          is_screen: isScreen,
         });
       } else {
         console.log("All ICE candidates have been sent!!");
@@ -289,14 +344,23 @@ function Demo8() {
 
     addMediaTracks(peerConnection, localStream);
 
-    //Set the onicecandidate event
-    setIceCandidateEvent(peerConnection, receiver_channel_name);
-
     //Create video element for remote Peer
-    setRemoteTracks(peerConnection, peerUserId);
+    var newPeerNameInfo = mappingOfferPeerConnectionTracks(
+      peerConnection,
+      peerUserId,
+      localScreenSharing,
+      remoteScreenSharing
+    );
 
     //set the oniceconnectionstatechange event
-    setICEConnectionStateChange(peerConnection, peerUserId, mapPeers.current);
+    setICEConnectionStateChange(peerConnection, newPeerNameInfo);
+
+    //Set the onicecandidate event
+    setIceCandidateEvent(
+      peerConnection,
+      receiver_channel_name,
+      newPeerNameInfo
+    );
 
     //CreateOffer
     peerConnection
@@ -325,6 +389,68 @@ function Demo8() {
     return peerConnection;
   };
 
+  const mappingAnswerPeerConnectionTracks = (
+    peer,
+    peerUserId,
+    localScreenSharing,
+    remoteScreenSharing
+  ) => {
+    var peerUsername = peerUserId;
+    var isMapPeer = true;
+    if (!localScreenSharing && !remoteScreenSharing) {
+      // if none are sharing screens (normal operation)
+
+      // set remote video
+      setRemoteTracks(peer, peerUsername, false);
+
+      // it will have an RTCDataChannel
+      peer.ondatachannel = (e) => {
+        peer.dc = e.channel;
+        // store the RTCPeerConnection
+        // and the corresponding RTCDataChannel
+        // after the RTCDataChannel is ready
+        // otherwise, peer.dc may be undefined
+        // as peer.ondatachannel would not be called yet
+        mapPeers.current.set(peerUsername, [peer, peer.dc]);
+      };
+    } else if (localScreenSharing && !remoteScreenSharing) {
+      // answerer itself is sharing screen
+      isMapPeer = false;
+      // it will have an RTCDataChannel
+      peer.ondatachannel = (e) => {
+        peer.dc = e.channel;
+        // this peer is a screen sharer
+        // so its connections will be stored in mapScreenPeers
+        // store the RTCPeerConnection
+        // and the corresponding RTCDataChannel
+        // after the RTCDataChannel is ready
+        // otherwise, peer.dc may be undefined
+        // as peer.ondatachannel would not be called yet
+        mapScreenPeers.current.set(peerUsername, [peer, peer.dc]);
+      };
+    } else {
+      // offerer is sharing screen
+
+      // set remote video
+      peerUsername = peerUsername + " Screen";
+      // and add tracks to remote video
+      setRemoteTracks(peer, peerUsername, false);
+
+      // it will have an RTCDataChannel
+      peer.ondatachannel = (e) => {
+        peer.dc = e.channel;
+        // store the RTCPeerConnection
+        // and the corresponding RTCDataChannel
+        // after the RTCDataChannel is ready
+        // otherwise, peer.dc may be undefined
+        // as peer.ondatachannel would not be called yet
+        mapPeers.current.set(peerUsername, [peer, peer.dc]);
+      };
+    }
+
+    return [peerUsername, isMapPeer];
+  };
+
   const CreateAnswerRTCPeerConnection = (
     offer,
     peerUserId,
@@ -336,14 +462,23 @@ function Demo8() {
 
     addMediaTracks(peerConnection, localStream);
 
-    //Set the onicecandidate event
-    setIceCandidateEvent(peerConnection, receiver_channel_name);
-
     //Create video element for remote Peer
-    setRemoteTracks(peerConnection, peerUserId);
+    var newPeerNameInfo = mappingAnswerPeerConnectionTracks(
+      peerConnection,
+      peerUserId,
+      localScreenSharing,
+      remoteScreenSharing
+    );
 
     //set the oniceconnectionstatechange event
-    setICEConnectionStateChange(peerConnection, peerUserId, mapPeers.current);
+    setICEConnectionStateChange(peerConnection, newPeerNameInfo);
+
+    //Set the onicecandidate event
+    setIceCandidateEvent(
+      peerConnection,
+      receiver_channel_name,
+      newPeerNameInfo
+    );
 
     //CreateAnswer
     if (offer) {
@@ -376,22 +511,33 @@ function Demo8() {
     }
   };
 
-  const receiveICECandidates = async (peerUserId,ice_candidate, is_screen) => {
+  const receiveICECandidates = async (peerUserId, ice_candidate, is_screen) => {
     if (!ice_candidate) {
       console.log("ICE candidate is empty");
       return;
     }
+
     try {
       if (is_screen) {
-        console.log("IS screen ", mapScreenPeers.current.has(peerUserId));
-        mapScreenPeers.get(peerUserId).addIceCandidate(ice_candidate);
+        if (mapScreenPeers.current.has(peerUserId)) {
+          mapScreenPeers.current
+            .get(peerUserId)[0]
+            .addIceCandidate(ice_candidate);
+        } else {
+          mapPeers.current
+            .get(peerUserId + " Screen")[0]
+            .addIceCandidate(ice_candidate);
+        }
       } else {
-        console.log("IS not screen ", mapPeers.current.has(peerUserId));
-        mapPeers.current.get(peerUserId).addIceCandidate(ice_candidate);
+        mapPeers.current.get(peerUserId)[0].addIceCandidate(ice_candidate);
       }
     } catch (error) {
       console.error("Error adding received ice candidate", error);
     }
+
+    console.log("mapScreenPeers.current", mapScreenPeers.current);
+
+    console.log("mapPeers.current", mapPeers.current);
   };
 
   const handleMessage = (event) => {
@@ -406,10 +552,16 @@ function Demo8() {
 
     var action = parsedData.action;
     console.log("action", action);
-    if (action == "ICECandidate" && mapPeers.current.has(peerUserId)) {
+    if (
+      action == "ICECandidate" &&
+      (mapPeers.current.has(peerUserId) ||
+        mapPeers.current.has(peerUserId + " Screen") ||
+        mapScreenPeers.current.has(peerUserId))
+    ) {
       let ice_candidate = parsedData.message.ice_candidate;
       let is_screen = parsedData.message.is_screen;
-      receiveICECandidates(peerUserId,ice_candidate, is_screen);
+      console.log("is_screen", is_screen);
+      receiveICECandidates(peerUserId, ice_candidate, is_screen);
       return;
     }
 
@@ -439,7 +591,6 @@ function Demo8() {
         );
       }
 
-      mapPeers.current.set(peerUserId, peerConnection);
       console.log(
         `Current ${userId.current} mapping user ${peerUserId} in map peers (new-peer)`
       );
@@ -452,20 +603,33 @@ function Demo8() {
           "with receiver_channel_name" +
           receiver_channel_name
       );
-      var peerConnection = CreateAnswerRTCPeerConnection(
+      CreateAnswerRTCPeerConnection(
         offer,
         peerUserId,
         receiver_channel_name,
         localScreenSharing,
         remoteScreenSharing
       );
-      mapPeers.current.set(peerUserId, peerConnection);
       console.log(
         `Current ${userId.current} mapping user ${peerUserId} in map peers (new-offer)`
       );
       return;
-    } else if (action == "new-answer" && mapPeers.current.has(peerUserId)) {
-      var peerConnection = mapPeers.current.get(peerUserId);
+    } else if (
+      action == "new-answer" &&
+      (mapPeers.current.has(peerUserId) ||
+        mapScreenPeers.current.has(peerUserId) ||
+        mapPeers.current.has(peerUserId + " Screen"))
+    ) {
+      var peerConnection = null;
+      if (mapPeers.current.has(peerUserId)) {
+        peerConnection = mapPeers.current.get(peerUserId)[0];
+      } else {
+        if (mapScreenPeers.current.has(peerUserId)) {
+          peerConnection = mapScreenPeers.current.get(peerUserId)[0];
+        } else {
+          peerConnection = mapPeers.current.get(peerUserId + " Screen")[0];
+        }
+      }
       console.log(
         "Receive new answer from user " +
           peerUserId +
@@ -599,7 +763,6 @@ function Demo8() {
   };
 
   const sendSignal = (action, message) => {
-    console.log("Websocket.current", webSocket.current);
     webSocket.current.send(
       JSON.stringify({
         peer: userId.current,
