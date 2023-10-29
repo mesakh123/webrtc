@@ -1,12 +1,12 @@
-import React from 'react';
-import {StyleSheet, TouchableOpacity, Text} from 'react-native';
+import React from "react";
+import { StyleSheet, TouchableOpacity, Text } from "react-native";
 import {
   RTCIceCandidate,
   RTCSessionDescription,
   RTCView,
-} from 'react-native-webrtc';
-import MediaDevice from '../../utils/mediaDevice';
-import Peer from '../../utils/peer';
+} from "react-native-webrtc";
+import MediaDevice from "../../utils/mediaDevice";
+import Peer from "../../utils/peer";
 
 class VideoCallView extends React.Component {
   mediaDevice = new MediaDevice(true, 480, 640, 30);
@@ -24,7 +24,7 @@ class VideoCallView extends React.Component {
 
   componentDidMount() {
     console.log("Video call mounted");
-    this.mediaDevice.getStream().then(stream => {
+    this.mediaDevice.getStream().then((stream) => {
       this.setState({
         stream: stream,
       });
@@ -34,13 +34,13 @@ class VideoCallView extends React.Component {
       }
     });
 
-    this.props.socket.on('remoteDescription', this._onRemoteDescripton);
+    this.props.socket.on("remoteDescription", this._onRemoteDescripton);
   }
 
   componentWillUnmount() {
     this.props.socket.removeListener(
-      'remoteDescription',
-      this._onRemoteDescripton,
+      "remoteDescription",
+      this._onRemoteDescripton
     );
     this.state.pc.close();
     this.setState({
@@ -51,18 +51,18 @@ class VideoCallView extends React.Component {
     });
   }
 
-  _onRemoteDescripton = data => {
+  _onRemoteDescripton = (data) => {
     if (data.desc) {
       let sdp = new RTCSessionDescription(data.desc);
 
-      if (sdp.type === 'offer') {
+      if (sdp.type === "offer") {
         let peer = new Peer(
           this.state.stream,
           data.from,
           false,
           this._sentDescription,
           this._onRemoteStream,
-          this._onCloseCall,
+          this._onCloseCall
         );
 
         peer.onOffer(sdp);
@@ -70,7 +70,7 @@ class VideoCallView extends React.Component {
         this.setState({
           pc: peer,
         });
-      } else if (sdp.type === 'answer') {
+      } else if (sdp.type === "answer") {
         this.state.pc.onAnswer(sdp);
       }
     } else if (data.candidate) {
@@ -79,14 +79,14 @@ class VideoCallView extends React.Component {
     }
   };
 
-  _onSelectPeer = socketId => {
+  _onSelectPeer = (socketId) => {
     let peer = new Peer(
       this.state.stream,
       socketId,
       true,
       this._sentDescription,
       this._onRemoteStream,
-      this._onCloseCall,
+      this._onCloseCall
     );
     this.setState({
       pc: peer,
@@ -95,19 +95,19 @@ class VideoCallView extends React.Component {
 
   _sentDescription = (to, data) => {
     if (data.sdp) {
-      this.props.socket.emit('setDescription', {
+      this.props.socket.emit("setDescription", {
         to: to,
         desc: data,
       });
     } else if (data.candidate) {
-      this.props.socket.emit('setDescription', {
+      this.props.socket.emit("setDescription", {
         to: to,
         candidate: data,
       });
     }
   };
 
-  _onRemoteStream = stream => {
+  _onRemoteStream = (stream) => {
     this.setState({
       remote: stream,
     });
@@ -129,7 +129,8 @@ class VideoCallView extends React.Component {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.decline]}
-          onPress={this._onCloseCall}>
+          onPress={this._onCloseCall}
+        >
           <Text style={styles.decline}>Beenden</Text>
         </TouchableOpacity>
       </React.Fragment>
@@ -140,32 +141,32 @@ class VideoCallView extends React.Component {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    height: '100%',
-    width: '100%',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "white",
+    height: "100%",
+    width: "100%",
   },
   view: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   text: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 15,
     fontSize: 26,
   },
   button: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
-    width: '100%',
-    alignItems: 'center',
-    backgroundColor: '#DDDDDD',
+    width: "100%",
+    alignItems: "center",
+    backgroundColor: "#DDDDDD",
     padding: 10,
   },
   decline: {
-    backgroundColor: '#cd0030',
-    color: '#ffffff',
+    backgroundColor: "#cd0030",
+    color: "#ffffff",
   },
 });
 

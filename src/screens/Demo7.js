@@ -99,135 +99,11 @@ function Demo7() {
   };
 
   const SERVERLIST = [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" },
-    { urls: "stun:stun3.l.google.com:19302" },
-    { urls: "stun:stun4.l.google.com:19302" },
-    { urls: "stun.ekiga.net" },
-    { urls: "stun.ideasip.com" },
-    { urls: "stun.rixtelecom.se" },
-    { urls: "stun.schlund.de" },
-    { urls: "stun.stunprotocol.org:3478" },
-    { urls: "stun.voiparound.com" },
-    { urls: "stun.voipbuster.com" },
-    { urls: "stun.voipstunt.com" },
-    { urls: "stun.voxgratia.org" },
-    {
-      urls: "stun:freeturn.net:3478",
-    },
-    {
-      urls: "stun:freeturn.net:5349",
-    },
+    { url: "stun:stun.l.google.com:19302" },
     {
       urls: "turn:freeturn.net:3478",
       username: "free",
       credential: "free",
-    },
-
-    {
-      urls: "turns:freeturn.net:5349",
-      username: "free",
-      credential: "free",
-    },
-
-    { urls: "stun:stun.relay.metered.ca:80" },
-    {
-      credential: "eFD2V65kF3b04lXG",
-      urls: "turn:a.relay.metered.ca:80",
-      username: "efd7e25209beee9eca3d6ef9",
-    },
-    {
-      credential: "eFD2V65kF3b04lXG",
-      urls: "turn:a.relay.metered.ca:80?transport=tcp",
-      username: "efd7e25209beee9eca3d6ef9",
-    },
-    {
-      credential: "eFD2V65kF3b04lXG",
-      urls: "turn:a.relay.metered.ca:443",
-      username: "efd7e25209beee9eca3d6ef9",
-    },
-    {
-      credential: "eFD2V65kF3b04lXG",
-      urls: "turn:a.relay.metered.ca:443?transport=tcp",
-      username: "efd7e25209beee9eca3d6ef9",
-    },
-
-    {
-      urls: "stun:stun.relay.metered.ca:80",
-    },
-    {
-        urls: [
-          "stun:stun1.l.google.com:19302",
-          "stun:a.relay.metered.ca:80",
-          "stun:stun2.l.google.com:19302",
-          "stun:stun3.l.google.com:19302",
-          "stun:stun4.l.google.com:19302",
-          "stun:stun.freevoipdeal.com:3478",
-          "stun:bn-turn1.xirsys.com",
-        ],
-      },
-      {
-        urls: "turn:openrelay.metered.ca:80",
-        username: "openrelayproject",
-        credential: "openrelayproject",
-      },
-      {
-        url: "turn:numb.viagenie.ca",
-        credential: "muazkh",
-        username: "webrtc@live.com",
-      },
-      {
-        url: "turn:turn.bistri.com:80",
-        credential: "homeo",
-        username: "homeo",
-      },
-      {
-        url: "turn:turn.anyfirewall.com:443?transport=tcp",
-        credential: "webrtc",
-        username: "webrtc",
-      },
-      {
-        urls: "turn:a.relay.metered.ca:80",
-        username: "69af939fef256835a4f3b00e",
-        credential: "lbUFDSyF6j3MVZLd",
-      },
-      {
-        urls: "turn:a.relay.metered.ca:80?transport=tcp",
-        username: "69af939fef256835a4f3b00e",
-        credential: "lbUFDSyF6j3MVZLd",
-      },
-      {
-        urls: "turn:a.relay.metered.ca:443",
-        username: "69af939fef256835a4f3b00e",
-        credential: "lbUFDSyF6j3MVZLd",
-      },
-      {
-        urls: "turn:a.relay.metered.ca:443?transport=tcp",
-        username: "69af939fef256835a4f3b00e",
-        credential: "lbUFDSyF6j3MVZLd",
-      },
-      {
-        username:
-          "UEK79BUzSp4OBBEUMDCHPTGOTKJbUueRyfOjjzNVot4LG9RZpoBOZqdaAzCMek32AAAAAGRpDz92ZW5rYXQxMjM=",
-        credential: "e4a7926a-f73a-11ed-9f71-0242ac140004",
-        urls: [
-          "turn:bn-turn1.xirsys.com:80?transport=udp",
-          "turn:bn-turn1.xirsys.com:3478?transport=udp",
-          "turn:bn-turn1.xirsys.com:80?transport=tcp",
-          "turn:bn-turn1.xirsys.com:3478?transport=tcp",
-          "turns:bn-turn1.xirsys.com:443?transport=tcp",
-          "turns:bn-turn1.xirsys.com:5349?transport=tcp",
-        ],
-      },
-    {
-        url: 'stun:global.stun.twilio.com:3478?transport=udp',
-        urls: 'stun:global.stun.twilio.com:3478?transport=udp',
-      },
-    {
-      url: "turn:numb.viagenie.ca",
-      credential: "muazkh",
-      username: "webrtc@live.com",
     },
   ];
 
@@ -336,12 +212,11 @@ function Demo7() {
 
       var newMapPeersKey = srcPeerUserId + " Screen";
       usedMapUserId = newMapPeersKey;
-      
+
       currentMapPeers = mapPeers.current.set(newMapPeersKey, [
         peerConnection,
         dataChannel,
       ]);
-
 
       var newSrcPeerUserId = srcPeerUserId + "-screen";
       setOnTrack(peerConnection, newSrcPeerUserId, true);
@@ -426,13 +301,13 @@ function Demo7() {
         // peerConnection.addIceCandidate(event.candidate);
         return;
       }
-        sendSignal("new-offer", {
-          sdp: peerConnection.localDescription,
-          receiver_channel_name: receiver_channel_name,
-          local_screen_sharing: localScreenSharing,
-          // candidate:candidate,
-          remote_screen_sharing: remoteScreenSharing,
-        });
+      sendSignal("new-offer", {
+        sdp: peerConnection.localDescription,
+        receiver_channel_name: receiver_channel_name,
+        local_screen_sharing: localScreenSharing,
+        // candidate:candidate,
+        remote_screen_sharing: remoteScreenSharing,
+      });
     };
 
     // Create and send offer

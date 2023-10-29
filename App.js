@@ -1,72 +1,25 @@
-import React from 'react';
-import {StyleSheet, StatusBar, TouchableOpacity} from 'react-native';
-import io from 'socket.io-client';
-import DeviceList from './src/components/DeviceList/DeviceList';
-import VideoCallView from './src/components/VideoCallView/VideoCallView';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+// import CallScreen from './src/screens/CallScreen';
+import Demo from './src/screens/Demo';
 
-class App extends React.Component {
-  constructor(props) {
-    super(props);
-    const SERVER_URL = 'http://203.121.243.235:3001';
-    this.state = {
-      socket: io(SERVER_URL, {
-        jsonp: false,
-        transports: ['websocket'],
-      }),
-      connection: false,
-      callee: null,
-      caller: null,
-    };
-  }
+import Demo5 from './src/screens/Demo5';
+import Demo6 from './src/screens/Demo6';
 
-  componentDidMount() {
+import Demo7 from './src/screens/Demo7';
+import Demo8 from './src/screens/Demo8';
 
-    console.log("Mounted");
-  }
-
-  _onSelectPeer = item => {
-    this.setState({
-      connection: true,
-      callee: item,
-    });
-  };
-
-  _onAcceptCall = item => {
-    this.setState({
-      connection: true,
-      caller: item,
-    });
-  };
-
-  _onCloseCall = () => {
-    this.setState({
-      connection: false,
-      callee: null,
-      caller: null,
-    });
-  };
-
-  render() {
-    return (
-      <>
-        <StatusBar barStyle="dark-content" backgroundColor="white" />
-        {this.state.connection ? (
-          <VideoCallView
-            socket={this.state.socket}
-            callee={this.state.callee}
-            caller={this.state.caller}
-            onCloseCall={this._onCloseCall}
-          />
-        ) : this.state.socket ? (
-          <DeviceList
-            socket={this.state.socket}
-            onSelectPeer={this._onSelectPeer}
-            onAcceptCall={this._onAcceptCall}
-          />
-        ) : null}
-      </>
-    );
-  }
+export default function App() {
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="auto" />
+      <Demo8 />
+    </SafeAreaView>
+  );
 }
 
-export default App;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
