@@ -72,22 +72,6 @@ function Demo8() {
     }
   };
 
-  const addLocalTracks = (peer, localScreenSharing) => {
-    if (!localScreenSharing) {
-      // if it is not a screen sharing peer
-      // add user media tracks
-      peer.addStream(localStream);
-      localStream.getTracks().forEach((track) => {
-        peer.getLocalStreams()[0].addTrack(track);
-      });
-      return;
-    }
-    peer.addStream(localDisplayStream.current);
-    localDisplayStream.current.getTracks().forEach((track) => {
-      peer.getLocalStreams()[0].addTrack(track);
-    });
-  };
-
   useEffect(() => {
     // Get local media stream
     connectDevices();
@@ -123,29 +107,6 @@ function Demo8() {
     }
   };
 
-  const dcOnMessage = (event) => {
-    var message = event.data;
-    Alert.alert(srcPeerUserId, message);
-  };
-
-  const setOnIceCandidate = (
-    peerConnection,
-    receiver_channel_name,
-    isScreen
-  ) => {
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        sendSignal("ICECandidate", {
-          ice_candidate: event.candidate,
-          receiver_channel_name: receiver_channel_name,
-          is_screen: isScreen,
-        });
-      } else {
-        console.log("All ICE candidates have been sent!!");
-      }
-    };
-  };
-
   const mappingOfferPeerConnectionTracks = (
     peer,
     peerUserId,
@@ -164,10 +125,10 @@ function Demo8() {
     } else if (!localScreenSharing && remoteScreenSharing) {
       // answerer is screen sharing
       peerUsername = peerUsername + " Screen";
+      setRemoteTracks(peer, peerUsername, true);
       mapPeers.current.set(peerUsername, [peer, dataChannel]);
     } else {
       // offerer itself is sharing screen
-      setRemoteTracks(peer, peerUsername, true);
       mapScreenPeers.current.set(peerUsername, [peer, dataChannel]);
       isMapPeer = false;
     }
@@ -187,6 +148,7 @@ function Demo8() {
     }
 
     if (isRemoteDisplayStream) {
+      console.log("set remote display stream from ",srcPeerUserId);
       setRemoteDisplayStream(mediaStream);
     } else {
       setRemoteStream(mediaStream);
@@ -305,11 +267,19 @@ function Demo8() {
     iceServers: iceServers,
   };
 
-  const addMediaTracks = (peerConnection, localStream) => {
-    peerConnection.addStream(localStream);
-    localStream.getTracks().forEach((track) => {
+  const addMediaTracks = (peerConnection, localScreenSharing) => {
+    if(!localScreenSharing){
+      peerConnection.addStream(localStream);
+      localStream.getTracks().forEach((track) => {
+        peerConnection.getLocalStreams()[0].addTrack(track);
+      });
+      return
+    }
+    peerConnection.addStream(localDisplayStream.current);
+    localDisplayStream.current.getTracks().forEach((track) => {
       peerConnection.getLocalStreams()[0].addTrack(track);
     });
+    
   };
   //Trickle ICE (Send ICE Candidates to remote peer)
   function setIceCandidateEvent(
@@ -326,7 +296,6 @@ function Demo8() {
     }
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(userId.current + "Trigger ice candidate");
         sendSignal("ICECandidate", {
           ice_candidate: event.candidate,
           receiver_channel_name: receiver_channel_name,
@@ -347,7 +316,7 @@ function Demo8() {
     const peerConnection = new RTCPeerConnection(configuration);
     //   peerConnectionends.push(peerConnection);
 
-    addMediaTracks(peerConnection, localStream);
+    addMediaTracks(peerConnection, localScreenSharing);
 
     //Create video element for remote Peer
     var newPeerNameInfo = mappingOfferPeerConnectionTracks(
@@ -439,7 +408,7 @@ function Demo8() {
       // set remote video
       peerUsername = peerUsername + " Screen";
       // and add tracks to remote video
-      setRemoteTracks(peer, peerUsername, false);
+      setRemoteTracks(peer, peerUsername, true);
 
       // it will have an RTCDataChannel
       peer.ondatachannel = (e) => {
@@ -465,7 +434,7 @@ function Demo8() {
   ) => {
     const peerConnection = new RTCPeerConnection(configuration);
 
-    addMediaTracks(peerConnection, localStream);
+    addMediaTracks(peerConnection, localScreenSharing);
 
     //Create video element for remote Peer
     var newPeerNameInfo = mappingAnswerPeerConnectionTracks(
@@ -536,6 +505,7 @@ function Demo8() {
       } else {
         mapPeers.current.get(peerUserId)[0].addIceCandidate(ice_candidate);
       }
+
     } catch (error) {
       console.error("Error adding received ice candidate", error);
     }
@@ -572,19 +542,18 @@ function Demo8() {
 
     if (action == "new-peer") {
       console.log(
-        "Create new offer for user " +
-          peerUserId +
-          "with receiver_channel_name" +
-          receiver_channel_name
+        "Create new offer from user " +
+         userId.current+ " to "+
+          peerUserId
       );
-      var peerConnection = CreateOfferRTCPeerConnection(
+      CreateOfferRTCPeerConnection(
         peerUserId,
         false,
         remoteScreenSharing,
         receiver_channel_name
       );
       if (isShareScreen && !remoteScreenSharing) {
-        var pc = CreateOfferRTCPeerConnection(
+        CreateOfferRTCPeerConnection(
           peerUserId,
           true,
           remoteScreenSharing,
@@ -599,10 +568,9 @@ function Demo8() {
     } else if (action == "new-offer") {
       var offer = parsedData.message.sdp;
       console.log(
-        "Create new answer for user " +
-          peerUserId +
-          "with receiver_channel_name" +
-          receiver_channel_name
+        "Create new answer from user " +
+         userId.current+ " to "+
+          peerUserId
       );
       CreateAnswerRTCPeerConnection(
         offer,
@@ -611,9 +579,7 @@ function Demo8() {
         localScreenSharing,
         remoteScreenSharing
       );
-      console.log(
-        `Current ${userId.current} mapping user ${peerUserId} in map peers (new-offer)`
-      );
+     
       return;
     } else if (
       action == "new-answer" &&
@@ -622,20 +588,23 @@ function Demo8() {
         mapPeers.current.has(peerUserId + " Screen"))
     ) {
       var peerConnection = null;
-      if (mapPeers.current.has(peerUserId)) {
-        peerConnection = mapPeers.current.get(peerUserId)[0];
-      } else {
-        if (mapScreenPeers.current.has(peerUserId)) {
-          peerConnection = mapScreenPeers.current.get(peerUserId)[0];
-        } else {
-          peerConnection = mapPeers.current.get(peerUserId + " Screen")[0];
-        }
+      if (remoteScreenSharing) {
+        // if answerer is screen sharer
+        peerConnection = mapPeers.current.get(peerUserId + " Screen")[0];
       }
+      else if(localScreenSharing){
+        // if offerer was screen sharer
+        peerConnection = mapScreenPeers.current.get(peerUserId)[0];
+      }else{
+        // if both are non-screen sharers
+        peerConnection = mapPeers.current.get(peerUserId )[0];
+
+      }
+      var offer = parsedData.message.sdp;
       console.log(
-        "Receive new answer from user " +
-          peerUserId +
-          "with receiver_channel_name" +
-          receiver_channel_name
+        "Receive answer from user " +
+        peerUserId + " to "+userId.current
+          
       );
       receiveAnswer(peerConnection, parsedData.message.sdp);
       console.log(
@@ -680,6 +649,7 @@ function Demo8() {
         //         localStream.addTrack(track);
         //     });
         // }
+
         sendSignal("new-peer", {
           local_screen_sharing: true,
         });
@@ -717,12 +687,13 @@ function Demo8() {
 
   const toggleShareScreen = async () => {
     if (isShareScreen) {
+      setIsShareScreen(false);
       await stopForeGroundService();
       await stopScreenShare();
     } else {
+      setIsShareScreen(true);
       await startScreenShare();
     }
-    setIsShareScreen(!isShareScreen);
   };
 
   const connectWs = () => {
