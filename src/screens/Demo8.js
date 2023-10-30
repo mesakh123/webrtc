@@ -263,7 +263,12 @@ function Demo8() {
     currentPeerConnection.setRemoteDescription(sdp);
   };
   const iceServers = [
-     { urls: "stun:stun4.l.google.com:19302" },
+    {
+      urls: "stun:freeturn.net:3478",
+    },
+    {
+      urls: "stun:freeturn.net:5349",
+    },
     {
       urls: "turn:freeturn.net:3478",
       username: "free",
@@ -534,10 +539,6 @@ function Demo8() {
     } catch (error) {
       console.error("Error adding received ice candidate", error);
     }
-
-    console.log("mapScreenPeers.current", mapScreenPeers.current);
-
-    console.log("mapPeers.current", mapPeers.current);
   };
 
   const handleMessage = (event) => {
